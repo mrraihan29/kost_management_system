@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 import os
 from django.db import models
@@ -35,10 +36,22 @@ class Invoice(models.Model):
     due_date = models.DateField(help_text="Tanggal Jatuh Tempo (H-10)")
     
     base_rent_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    
+    electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS')
+    
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True) 
+    
+    def calculate_total(self):
+        """Fungsi bantu untuk hitung ulang total"""
+        total = self.base_rent_amount + self.electricity_bill_amount
+        self.total_amount = total
+        self.save() # Simpan perubahan
+
+    def save(self, *args, **kwargs):
+        # Hitung total saat pertama kali save
+        if not self.total_amount:
+            self.total_amount = self.base_rent_amount + self.electricity_bill_amount
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Tagihan {self.contract.tenant.full_name} ({self.billing_period_start})"
@@ -49,10 +62,30 @@ class ElectricityReading(models.Model):
     meter_reading_start = models.IntegerField()
     meter_reading_end = models.IntegerField()
     rate_per_kwh = models.DecimalField(max_digits=10, decimal_places=2)
-    calculated_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    calculated_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True)
+
+    def save(self, *args, **kwargs):
+        # 1. Hitung pemakaian
+        usage = self.meter_reading_end - self.meter_reading_start
+        
+        # 2. Hitung biaya (Usage * Rate)
+        if usage < 0:
+            # Safety check sederhana jika admin salah input (Akhir < Awal)
+            usage = 0 
+        
+        self.calculated_amount = usage * self.rate_per_kwh
+        
+        # 3. Simpan data diri sendiri dulu
+        super().save(*args, **kwargs)
+        
+        # 4. UPDATE OTOMATIS KE INVOICE INDUK
+        # Kita update field electricity_bill_amount di invoice terkait
+        self.invoice.electricity_bill_amount = self.calculated_amount
+        # Panggil fungsi hitung total di invoice
+        self.invoice.calculate_total()
 
     def __str__(self):
-        return f"Listrik untuk Tagihan #{self.invoice.id}"
+        return f"Listrik Tagihan #{self.invoice.id}"
 
 class Payment(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')

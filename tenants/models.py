@@ -2,6 +2,8 @@ import uuid
 import os
 from django.db import models
 from core.models import Room
+import random
+import string
 
 # Fungsi utilitas untuk merename file KTP agar unik (Security NFR-02)
 def ktp_upload_path(instance, filename):
@@ -33,9 +35,23 @@ class TenantContract(models.Model):
     monthly_rent_amount = models.DecimalField(max_digits=12, decimal_places=2)
     
     # PIN Pembayaran (FR-02) - Unik per kontrak
-    payment_pin = models.CharField(max_length=6, unique=True, help_text="PIN 6 digit unik untuk upload bukti bayar")
+    payment_pin = models.CharField(max_length=6, unique=True, blank=True, help_text="PIN 6 digit unik. Terisi otomatis jika kosong.")
     
     is_active = models.BooleanField(default=True)
+
+    # --- OVERRIDE SAVE ---
+    def save(self, *args, **kwargs):
+        # Jika PIN kosong, generate baru
+        if not self.payment_pin:
+            self.payment_pin = self.generate_unique_pin()
+        super().save(*args, **kwargs)
+
+    def generate_unique_pin(self):
+        # Loop sampai menemukan PIN yang belum dipakai (untuk hindari duplikat)
+        while True:
+            new_pin = ''.join(random.choices(string.digits, k=6))
+            if not TenantContract.objects.filter(payment_pin=new_pin).exists():
+                return new_pin
 
     def __str__(self):
         return f"Kontrak: {self.tenant.full_name} - {self.room.room_number}"
