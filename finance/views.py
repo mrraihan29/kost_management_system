@@ -4,6 +4,8 @@ from core.models import Room
 from tenants.models import TenantContract
 from .models import Invoice, Payment
 from .forms import PinValidationForm, PaymentUploadForm
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 
 def public_payment_step1(request):
     """
@@ -94,3 +96,38 @@ def public_payment_step2(request):
         'invoice': active_invoice
     }
     return render(request, 'finance/step2_upload.html', context)
+
+@login_required(login_url='/admin/login/')
+def verify_payment(request, payment_id, action):
+    """
+    Logika Verifikasi (Approve/Reject) FR-03
+    """
+    payment = get_object_or_404(Payment, id=payment_id)
+    invoice = payment.invoice
+
+    if action == 'approve':
+        # Update Invoice jadi LUNAS
+        invoice.status = 'LUNAS'
+        invoice.save()
+        
+        # Update Payment Info
+        payment.verified_by = request.user
+        payment.verified_at = timezone.now()
+        payment.save()
+        
+        messages.success(request, f"Pembayaran {invoice.contract.tenant.full_name} disetujui.")
+
+    elif action == 'reject':
+        # Kembalikan status Invoice ke TELAT_BAYAR (agar ditagih ulang)
+        invoice.status = 'TELAT_BAYAR'
+        invoice.save()
+        
+        # Update Payment Info
+        payment.verified_by = request.user
+        payment.verified_at = timezone.now()
+        payment.rejection_note = "Bukti tidak valid (Ditolak Admin)"
+        payment.save()
+        
+        messages.error(request, f"Pembayaran {invoice.contract.tenant.full_name} DITOLAK.")
+
+    return redirect('dashboard') # Kembali ke dashboard

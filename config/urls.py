@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('finance.urls')),
+    path('staff/', include('core.urls')), # Dashboard ada di /staff/dashboard/
 ]
 
 # Tambahkan baris ini untuk melayani file media saat development
