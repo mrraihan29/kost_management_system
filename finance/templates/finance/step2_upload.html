@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Langkah 2: Upload Bukti Bayar</h2>
+    
+    <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px;">
+        <h3>Konfirmasi Identitas</h3>
+        <p>Nama: <strong>{{ tenant_name }}</strong></p>
+        <p>Kamar: {{ room_info }}</p>
+        <p>Tagihan Aktif: 
+            {% if invoice %}
+                Rp {{ invoice.total_amount }} (Jatuh Tempo: {{ invoice.due_date }})
+            {% else %}
+                <span style="color: green;">Tidak ada tagihan aktif</span>
+            {% endif %}
+        </p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div style="color: blue;">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {% if invoice %}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Kirim Bukti Bayar</button>
+        </form>
+    {% else %}
+        <p>Anda tidak perlu mengupload bukti bayar saat ini.</p>
+    {% endif %}
+</body>
+</html>
