@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %} <!-- WAJIB ADA untuk intcomma -->
+
+{% block title %}Daftar Tagihan{% endblock %}
+
+{% block content %}
+<!-- Header Halaman -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+    <div class="mb-3 mb-md-0">
+        <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Daftar Tagihan</h2>
+        <p class="text-muted small mb-0">Riwayat pembayaran dan status tagihan</p>
+    </div>
+    <div>
+        <button class="btn btn-ink shadow-sm" onclick="alert('Fitur Generate Massal akan aktif di Phase 4!')">
+            <i class="fas fa-magic me-2"></i>Generate Bulan Ini
+        </button>
+    </div>
+</div>
+
+<!-- KARTU FILTER & TABEL -->
+<div class="card-paper overflow-hidden">
+    <!-- Toolbar Filter -->
+    <div class="card-header-clean bg-light py-3">
+        <form method="get" class="row g-3 align-items-center">
+            <!-- Filter Status -->
+            <div class="col-md-3">
+                <select name="status" class="form-select shadow-none" onchange="this.form.submit()" style="border-color: var(--color-border);">
+                    <option value="">-- Semua Status --</option>
+                    <option value="BELUM_LUNAS" {% if current_status == 'BELUM_LUNAS' %}selected{% endif %}>Belum Lunas</option>
+                    <option value="MENUNGGU_VERIFIKASI" {% if current_status == 'MENUNGGU_VERIFIKASI' %}selected{% endif %}>Menunggu Verifikasi</option>
+                    <option value="LUNAS" {% if current_status == 'LUNAS' %}selected{% endif %}>Lunas</option>
+                    <option value="TELAT_BAYAR" {% if current_status == 'TELAT_BAYAR' %}selected{% endif %}>Telat Bayar</option>
+                </select>
+            </div>
+
+            <!-- Search Box -->
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0 shadow-none" 
+                           placeholder="Cari nama penghuni atau nomor kamar..." 
+                           value="{{ search_query|default:'' }}"
+                           style="border-left: none;">
+                    <button type="submit" class="btn btn-primary">Cari</button>
+                </div>
+            </div>
+            
+            <!-- Reset Link -->
+            <div class="col-md-3 text-end">
+                <a href="{% url 'invoice_list' %}" class="text-muted small text-decoration-none hover-underline">
+                    <i class="fas fa-sync-alt me-1"></i> Reset Filter
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabel Data -->
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 table-hover">
+            <thead style="background-color: var(--color-primary-light);">
+                <tr>
+                    <th class="ps-4 py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">ID</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Penghuni & Kamar</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Periode</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Jatuh Tempo</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Total</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Status</th>
+                    <th class="pe-4 py-3 text-uppercase small fw-bold text-end" style="color: var(--color-primary);">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in invoices %}
+                <tr style="border-bottom: 1px solid var(--color-border);">
+                    <td class="ps-4 text-muted small fw-bold">#{{ inv.id }}</td>
+                    <td>
+                        <div class="fw-bold text-dark">{{ inv.contract.tenant.full_name }}</div>
+                        <span class="badge bg-light text-dark border border-secondary mt-1" style="font-weight: normal;">
+                            {{ inv.contract.room.room_number }}
+                        </span>
+                    </td>
+                    <td class="text-muted small">
+                        {{ inv.billing_period_start|date:"M Y" }}
+                    </td>
+                    <td class="small">
+                        <div class="d-flex flex-column">
+                            <span>{{ inv.due_date|date:"d M Y" }}</span>
+                            {% if inv.status == 'TELAT_BAYAR' %}
+                                <span class="text-danger fw-bold" style="font-size: 0.7rem;">LEWAT JATUH TEMPO</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="fw-bold" style="color: var(--color-text-main);">
+                        Rp {{ inv.total_amount|intcomma }}
+                    </td>
+                    <td>
+                        {% if inv.status == 'LUNAS' %}
+                            <span class="badge-pill badge-success"><i class="fas fa-check me-1"></i> Lunas</span>
+                        {% elif inv.status == 'TELAT_BAYAR' %}
+                            <span class="badge-pill badge-danger"><i class="fas fa-exclamation-circle me-1"></i> Telat</span>
+                        {% elif inv.status == 'MENUNGGU_VERIFIKASI' %}
+                            <span class="badge-pill badge-warning"><i class="fas fa-clock me-1"></i> Verifikasi</span>
+                        {% else %}
+                            <span class="badge bg-secondary text-white" style="border-radius: 20px; padding: 5px 10px; font-size: 0.75rem;">Belum Lunas</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4 text-end">
+                        
+                        <!-- TOMBOL WA (Hanya jika Belum Lunas / Telat) -->
+                        {% if inv.status == 'BELUM_LUNAS' or inv.status == 'TELAT_BAYAR' %}
+                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|cut:'-'|cut:' ' }}?text=Halo%20{{ inv.contract.tenant.full_name }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
+                                target="_blank" 
+                                class="btn btn-sm btn-outline-success me-1" 
+                                title="Kirim Tagihan via WA">
+                                <i class="fab fa-whatsapp"></i>
+                            </a>
+                        {% endif %}
+                        {% if inv.status == 'LUNAS' %}
+                            <!-- Tombol Cetak Kwitansi -->
+                            <a href="{% url 'print_receipt' inv.pk %}" target="_blank" class="btn btn-sm btn-ink-outline ms-1" title="Cetak Kwitansi">
+                                <i class="fas fa-print"></i>
+                            </a>
+                        {% endif %}
+
+                        <!-- Tombol Detail -->
+                        <a href="{% url 'invoice_detail' inv.pk %}" class="btn btn-sm btn-ink-outline me-1" title="Detail & Input Listrik">
+                            <i class="fas fa-file-invoice"></i>
+                        </a>
+                        
+                        <!-- Jika Pending, munculkan tombol verifikasi cepat -->
+                        {% if inv.status == 'MENUNGGU_VERIFIKASI' and inv.payments.last %}
+                            <a href="{{ inv.payments.last.payment_proof_file.url }}" target="_blank" class="btn btn-sm btn-warning text-white" title="Lihat Bukti">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <div class="mb-3"><i class="fas fa-folder-open fa-3x opacity-25"></i></div>
+                        <p class="mb-0">Data tagihan tidak ditemukan.</p>
+                        {% if search_query or current_status %}
+                            <a href="{% url 'invoice_list' %}" class="text-primary small">Reset Filter</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Footer Tabel -->
+    <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
+        <small class="text-muted">Menampilkan data terbaru</small>
+    </div>
+</div>
+{% endblock %}

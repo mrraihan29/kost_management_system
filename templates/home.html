@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Selamat Datang{% endblock %}
+
+{% block content %}
+<!-- Sembunyikan Sidebar & Navbar Mobile di halaman ini -->
+<style>
+    /* Override khusus halaman home agar full screen bersih */
+    #sidebar-wrapper { display: none !important; }
+    #page-content-wrapper { margin-left: 0 !important; width: 100% !important; }
+    .navbar { display: none !important; }
+    body { background-color: #F3F4F6; } /* Pastikan background abu-abu muda */
+</style>
+
+<div class="container d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+    <div class="col-md-8 col-lg-6">
+        
+        <!-- KARTU LANDING PAGE -->
+        <div class="card shadow-lg border-0 rounded-4 text-center overflow-hidden">
+            
+            <!-- Header Gambar / Logo -->
+            <div class="card-body p-5 pb-4">
+                <img src="{% static 'img/logo.png' %}" alt="Evy Kost Logo" class="mb-4" style="height: 100px; width: auto;">
+                
+                <h1 class="brand-font mb-2" style="color: var(--color-primary); font-size: 2.5rem;">Evy Kost</h1>
+                <p class="text-muted lead">Sistem Manajemen Kost Terintegrasi</p>
+                <hr class="my-4 w-50 mx-auto border-secondary opacity-25">
+            </div>
+
+            <!-- Pilihan Akses -->
+            <div class="card-body p-5 pt-0">
+                <div class="d-grid gap-3">
+                    
+                    <!-- Tombol Penghuni (Besar & Utama) -->
+                    <a href="{% url 'public_payment_step1' %}" class="btn btn-primary btn-lg py-3 shadow-sm d-flex align-items-center justify-content-center">
+                        <i class="fas fa-home me-3 fa-lg"></i>
+                        <div class="text-start">
+                            <div class="small text-uppercase ls-1 opacity-75" style="font-size: 0.7rem;">Area Penghuni</div>
+                            <div class="fw-bold fs-5">Cek Tagihan & Bayar</div>
+                        </div>
+                    </a>
+
+                    <!-- Tombol Admin (Sekunder) -->
+                    <a href="{% url 'login' %}" class="btn btn-outline-secondary py-3 border-0 bg-light text-muted d-flex align-items-center justify-content-center hover-shadow">
+                        <i class="fas fa-user-shield me-3"></i>
+                        <span>Login Pengelola / Admin</span>
+                    </a>
+
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="card-footer border-0 bg-white py-4 text-muted small">
+                &copy; {% now "Y" %} Evy Kost Management. <br> 
+                <span class="opacity-50">Mengelola Ancol, Kana, dan UNS.</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

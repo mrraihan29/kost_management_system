@@ -1,35 +1,130 @@
-<!DOCTYPE html>
-<html>
-<body>
-    <h2>Langkah 2: Upload Bukti Bayar</h2>
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %} 
+
+{% block title %}Upload Bukti{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 800px;">
     
-    <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 20px;">
-        <h3>Konfirmasi Identitas</h3>
-        <p>Nama: <strong>{{ tenant_name }}</strong></p>
-        <p>Kamar: {{ room_info }}</p>
-        <p>Tagihan Aktif: 
-            {% if invoice %}
-                Rp {{ invoice.total_amount }} (Jatuh Tempo: {{ invoice.due_date }})
-            {% else %}
-                <span style="color: green;">Tidak ada tagihan aktif</span>
-            {% endif %}
-        </p>
+    <!-- Judul Halaman -->
+    <div class="text-center mb-5">
+        <h2 class="brand-font text-primary fw-bold mb-2">Konfirmasi & Bayar</h2>
+        <p class="text-muted">Silakan periksa rincian tagihan Anda sebelum membayar.</p>
     </div>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div style="color: blue;">{{ message }}</div>
-        {% endfor %}
+    <div class="row justify-content-center g-4">
+        <!-- KOLOM KIRI: INFO PENGHUNI -->
+        <div class="col-md-6">
+            <div class="card-paper h-100">
+                <div class="card-body-clean">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="bg-primary bg-opacity-10 p-3 rounded-circle me-3">
+                            <i class="fas fa-user text-primary fa-2x"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-dark">{{ tenant_name }}</h5>
+                            <p class="mb-0 text-muted small text-uppercase ls-1">Penghuni Kost</p>
+                        </div>
+                    </div>
+                    
+                    <div class="border-top pt-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted small">Kamar</span>
+                            <span class="fw-bold text-dark">{{ room_info }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted small">Status</span>
+                            <span class="badge-pill badge-success">Aktif</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KOLOM KANAN: TAGIHAN -->
+        <div class="col-md-6">
+            <div class="card-paper h-100 border-primary border-2">
+                <div class="card-body-clean text-center d-flex flex-column justify-content-center">
+                    <h6 class="text-muted text-uppercase ls-1 small fw-bold mb-2">Total Tagihan Bulan Ini</h6>
+                    
+                    {% if invoice %}
+                        <h1 class="display-5 fw-bold mb-0 text-primary">
+                            Rp {{ invoice.total_amount|intcomma }}
+                        </h1>
+                        <div class="mt-3">
+                            {% if invoice.status == 'TELAT_BAYAR' %}
+                                <span class="badge-pill badge-danger">
+                                    <i class="fas fa-exclamation-circle me-1"></i> Telat Bayar
+                                </span>
+                            {% else %}
+                                <span class="badge-pill badge-warning text-dark">
+                                    <i class="fas fa-calendar-alt me-1"></i> Jatuh Tempo: {{ invoice.due_date|date:"d M Y" }}
+                                </span>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <h2 class="text-success fw-bold">LUNAS</h2>
+                        <p class="text-muted small">Tidak ada tagihan aktif saat ini.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORM UPLOAD (HANYA MUNCUL JIKA ADA TAGIHAN) -->
+    {% if invoice %}
+    <div class="card-paper mt-4">
+        <div class="card-header-clean bg-light border-bottom">
+            <h5 class="mb-0 fw-bold brand-font"><i class="fas fa-upload me-2 text-primary"></i>Upload Bukti Transfer</h5>
+        </div>
+        <div class="card-body-clean">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                    <div class="alert alert-danger small rounded-3 mb-3">{{ form.errors }}</div>
+                {% endif %}
+
+                <div class="mb-4">
+                    <label class="form-label-clean">Pilih Foto / File PDF</label>
+                    {{ form.payment_proof_file }}
+                    <div class="form-text mt-2 text-muted small"><i class="fas fa-info-circle me-1"></i> Pastikan foto jelas dan terbaca. Maks 2MB.</div>
+                </div>
+
+                <div class="d-grid gap-3">
+                    <button type="submit" class="btn-ink py-3 shadow-sm">
+                        <i class="fas fa-paper-plane me-2"></i> Kirim Bukti Bayar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     {% endif %}
 
-    {% if invoice %}
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit">Kirim Bukti Bayar</button>
-        </form>
-    {% else %}
-        <p>Anda tidak perlu mengupload bukti bayar saat ini.</p>
-    {% endif %}
-</body>
-</html>
+    <!-- TOMBOL NAVIGASI UMUM (SELALU MUNCUL) -->
+    <div class="mt-4 d-grid gap-3">
+        <!-- Tombol Riwayat dipindah ke luar blok 'if invoice' -->
+        <a href="{% url 'public_payment_history' %}" class="btn btn-ink-outline py-2 border-0" style="background-color: var(--color-primary-light); color: var(--color-primary);">
+            <i class="fas fa-history me-2"></i> Lihat Riwayat Pembayaran
+        </a>
+
+        <a href="{% url 'public_report_create' %}" class="btn btn-outline-danger py-2 border-0 fw-bold" style="background-color: #FEF2F2; color: #DC2626;">
+            <i class="fas fa-tools me-2"></i> Lapor Kerusakan / Komplain
+        </a>
+
+        <a href="{% url 'public_payment_step1' %}" class="btn btn-outline-secondary border-0 btn-sm">Keluar / Ganti Kamar</a>
+    </div>
+
+</div>
+
+<script>
+    // Styling manual untuk input file agar rapi
+    document.addEventListener("DOMContentLoaded", function() {
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) {
+            fileInput.classList.add('form-control', 'form-control-lg');
+        }
+    });
+</script>
+{% endblock %}

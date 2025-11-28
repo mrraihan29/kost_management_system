@@ -55,3 +55,36 @@ class TenantContract(models.Model):
 
     def __str__(self):
         return f"Kontrak: {self.tenant.full_name} - {self.room.room_number}"
+    
+def ticket_upload_path(instance, filename):
+    ext = filename.split('.')[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    return os.path.join('maintenance_tickets', filename)
+
+class MaintenanceTicket(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Menunggu Respon'),
+        ('PROSES', 'Sedang Diperbaiki'),
+        ('SELESAI', 'Selesai'),
+        ('DITOLAK', 'Ditolak/Batal'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('LOW', 'Rendah (Tidak Mendesak)'),
+        ('MEDIUM', 'Sedang'),
+        ('HIGH', 'Tinggi (Darurat/Bahaya)'),
+    ]
+
+    contract = models.ForeignKey(TenantContract, on_delete=models.CASCADE, related_name='tickets')
+    title = models.CharField(max_length=200, verbose_name="Judul Laporan")
+    description = models.TextField(verbose_name="Detail Kerusakan")
+    photo = models.ImageField(upload_to=ticket_upload_path, blank=True, null=True, verbose_name="Foto Bukti")
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='MEDIUM')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True) # Kapan status terakhir berubah
+
+    def __str__(self):
+        return f"Tiket #{self.id}: {self.title}"

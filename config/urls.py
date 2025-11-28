@@ -18,11 +18,24 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.auth import views as auth_views
+from core.views import home
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', home, name='home'),
+    # URL Login Custom (Mengarah ke template baru kita)
+        path('accounts/login/', auth_views.LoginView.as_view(
+        template_name='auth/login.html',
+        extra_context={'hide_sidebar': True}  # <--- INI KUNCINYA
+    ), name='login'),
+    # URL Logout (Redirect ke login lagi setelah logout)
+    
+    path('accounts/logout/', auth_views.LogoutView.as_view(next_page='/accounts/login/'), name='logout'),
     path('', include('finance.urls')),
     path('staff/', include('core.urls')), # Dashboard ada di /staff/dashboard/
+        # TAMBAHKAN INI:
+    path('staff/tenants/', include('tenants.urls')), 
 ]
 
 # Tambahkan baris ini untuk melayani file media saat development

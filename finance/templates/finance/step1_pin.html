@@ -1,18 +1,101 @@
-<!DOCTYPE html>
-<html>
-<body>
-    <h2>Langkah 1: Validasi Penghuni</h2>
-    
-    {% if messages %}
-        {% for message in messages %}
-            <div style="color: red;">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
+{% extends 'base.html' %}
+{% load static %}
 
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Cek Tagihan</button>
-    </form>
-</body>
-</html>
+{% block title %}Cek Tagihan{% endblock %}
+
+{% block content %}
+<div class="container-fluid d-flex align-items-center justify-content-center" style="min-height: 100vh; background-color: #F3F4F6;">
+    
+    <div class="col-md-5 col-lg-4">
+        
+        <!-- KARTU CEK TAGIHAN -->
+        <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+            <!-- Header Warna Biru Indigo -->
+            <div class="card-header text-center py-4 border-0" style="background-color: var(--color-primary);">
+                <h4 class="mb-0 text-white brand-font"><i class="fas fa-search-dollar me-2"></i>Cek Tagihan</h4>
+                <p class="text-white-50 small mb-0 mt-1">Masukkan data kamar Anda</p>
+            </div>
+
+            <div class="card-body p-5">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Pesan Error -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-danger d-flex align-items-center p-2 mb-3 small border-0 rounded-3" role="alert" style="background-color: #FEE2E2; color: #B91C1C;">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                <div>{{ message }}</div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Input Lokasi -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase ls-1">Lokasi Kost</label>
+                        {{ form.kost_location }}
+                        <!-- Pastikan widget di forms.py punya class 'form-select' -->
+                    </div>
+
+                    <!-- Input Kamar -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase ls-1">Nomor Kamar</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                <i class="fas fa-door-closed"></i>
+                            </span>
+                            {{ form.room_number }}
+                        </div>
+                    </div>
+
+                    <!-- Input PIN -->
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-muted text-uppercase ls-1">PIN Pembayaran</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                <i class="fas fa-key"></i>
+                            </span>
+                            {{ form.pin }}
+                        </div>
+                        <div class="form-text small text-end mt-1">PIN 6 digit dari kontrak Anda</div>
+                    </div>
+
+                    <!-- Tombol Cek -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary py-3 fw-bold shadow-sm" style="background-color: var(--color-primary); border: none; border-radius: 8px;">
+                            Lihat Tagihan Saya <i class="fas fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="card-footer text-center py-3 border-0 bg-light">
+                <small class="text-muted">Butuh bantuan? Hubungi Penjaga Kost.</small>
+            </div>
+        </div>
+
+        <div class="text-center mt-4 text-muted small">
+            &copy; 2025 Evy Kost Management
+        </div>
+
+    </div>
+</div>
+
+<!-- Script Kecil untuk Mempercantik Form Django Otomatis -->
+<script>
+    // Menambahkan class Bootstrap ke inputan form Django jika belum ada
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll('input[type="text"], input[type="password"], select');
+        inputs.forEach(input => {
+            if (!input.classList.contains('form-control') && !input.classList.contains('form-select')) {
+                input.classList.add('form-control', 'border-start-0', 'ps-2', 'shadow-none');
+                input.style.borderLeft = 'none';
+            }
+            if (input.tagName === 'SELECT') {
+                input.classList.add('form-select', 'shadow-none');
+                input.classList.remove('border-start-0'); // Select tidak pakai input group icon
+            }
+        });
+    });
+</script>
+{% endblock %}

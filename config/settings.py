@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'core',
     'tenants',
     'finance',
+    'django.contrib.humanize'
 ]
 
 MIDDLEWARE = [
@@ -58,7 +59,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -133,7 +134,17 @@ import os
 
 # Konfigurasi Static Files (CSS, JS)
 STATIC_URL = 'static/'
+import os
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 # Konfigurasi Media Files (Upload User: KTP, Bukti Bayar)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Redirect setelah login sukses
+LOGIN_REDIRECT_URL = '/staff/dashboard/'
+
+# Redirect jika user belum login mencoba akses halaman terkunci
+LOGIN_URL = '/accounts/login/'

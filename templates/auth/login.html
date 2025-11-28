@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Masuk Admin{% endblock %}
+
+{% block content %}
+<!-- Container Penuh Layar -->
+<div class="container-fluid d-flex align-items-center justify-content-center" style="min-height: 100vh; background-color: #F3F4F6;">
+    
+    <div class="col-md-4 col-lg-3"> <!-- Ukuran Kartu Pas -->
+        
+        <!-- KARTU LOGIN -->
+        <div class="card shadow-lg border-0 rounded-4" style="overflow: hidden;">
+            <div class="card-body p-5">
+                
+                <!-- Logo & Header -->
+                <div class="text-center mb-4">
+                    <img src="{% static 'img/logo.png' %}" alt="EKM Logo" class="mb-3" style="height: 70px; width: auto;">
+                    <h4 class="brand-font mb-1" style="color: var(--color-primary); font-weight: 800;">Admin Panel</h4>
+                    <p class="text-muted small">Evy Kost Management</p>
+                </div>
+
+                <!-- Form Login -->
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Alert Error -->
+                    {% if form.errors %}
+                        <div class="alert alert-danger d-flex align-items-center p-2 mb-3 small" role="alert" style="background-color: #FEE2E2; border: none; color: #B91C1C; border-radius: 8px;">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            <div>Username/Password salah.</div>
+                        </div>
+                    {% endif %}
+
+                    <!-- Input Username -->
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label small fw-bold text-muted">Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                <i class="fas fa-user"></i>
+                            </span>
+                            <input type="text" name="username" class="form-control border-start-0 ps-2 shadow-none" id="id_username" placeholder="namauser" required style="border-left: none;">
+                        </div>
+                    </div>
+
+                    <!-- Input Password -->
+                    <div class="mb-4">
+                        <label for="id_password" class="form-label small fw-bold text-muted">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0 text-muted ps-3">
+                                <i class="fas fa-lock"></i>
+                            </span>
+                            <input type="password" name="password" class="form-control border-start-0 ps-2 shadow-none" id="id_password" placeholder="••••••" required style="border-left: none;">
+                        </div>
+                    </div>
+
+                    <!-- Tombol Login -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary py-2 fw-bold shadow-sm" style="background-color: var(--color-primary); border: none;">
+                            Masuk <i class="fas fa-sign-in-alt ms-2"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Footer Kartu -->
+            <div class="card-footer text-center py-3 border-0" style="background-color: #f9fafb;">
+                <small class="text-muted">Butuh bantuan? Hubungi Super Admin.</small>
+            </div>
+        </div>
+        <!-- AKHIR KARTU -->
+
+        <!-- Copyright Luar -->
+        <div class="text-center mt-4 text-muted small">
+            &copy; 2025 Evy Kost Management v1.0
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load finance_extras %} 
+{% block title %}Detail Tagihan #{{ invoice.id }}{% endblock %}
+
+{% block content %}
+<!-- HEADER & NAVIGASI -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{% url 'invoice_list' %}" class="text-decoration-none text-muted small mb-2 d-block">
+            <i class="fas fa-arrow-left me-1"></i> Kembali ke Daftar
+        </a>
+        <h2 class="brand-font mb-0" style="color: var(--color-text-main);">Tagihan #{{ invoice.id }}</h2>
+        <p class="text-muted small mb-0">
+            Periode: {{ invoice.billing_period_start|date:"F Y" }}
+        </p>
+    </div>
+    
+    <!-- Status Badge Besar -->
+    <div>
+        {% if invoice.status == 'LUNAS' %}
+            <span class="badge-pill badge-success fs-6 px-3 py-2">LUNAS</span>
+        {% elif invoice.status == 'TELAT_BAYAR' %}
+            <span class="badge-pill badge-danger fs-6 px-3 py-2">TELAT BAYAR</span>
+        {% elif invoice.status == 'MENUNGGU_VERIFIKASI' %}
+            <span class="badge-pill badge-warning fs-6 px-3 py-2">VERIFIKASI</span>
+        {% else %}
+            <span class="badge bg-light text-dark border px-3 py-2">BELUM LUNAS</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    
+    <!-- KOLOM KIRI: RINCIAN TAGIHAN -->
+    <div class="col-md-7">
+        <div class="card-paper h-100">
+            <div class="card-header-clean d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 brand-font">Rincian Biaya</h5>
+                <span class="badge bg-light text-dark">{{ invoice.contract.room.room_number }}</span>
+            </div>
+            <div class="card-body-clean">
+                
+                <!-- Info Penghuni -->
+                <div class="d-flex align-items-center mb-4 p-3 rounded-3" style="background-color: #f8f9fa;">
+                    <div class="bg-white rounded-circle d-flex align-items-center justify-content-center text-primary shadow-sm me-3" style="width: 50px; height: 50px; font-weight: bold; font-size: 1.2rem;">
+                        {{ invoice.contract.tenant.full_name|slice:":1" }}
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">{{ invoice.contract.tenant.full_name }}</h6>
+                        <small class="text-muted">PIN Pembayaran: <strong>{{ invoice.contract.payment_pin }}</strong></small>
+                    </div>
+                </div>
+
+                <!-- Tabel Rincian -->
+                <table class="table table-borderless mb-4">
+                    <tbody>
+                        <tr class="border-bottom">
+                            <td class="text-muted py-3">Sewa Kamar</td>
+                            <td class="text-end fw-bold py-3">Rp {{ invoice.base_rent_amount|intcomma }}</td>
+                        </tr>
+                        <tr class="border-bottom">
+                            <td class="text-muted py-3">
+                                Listrik
+                                {% if electricity %}
+                                    <span class="badge bg-info text-dark ms-2" style="font-size: 0.7em;">{{ electricity.calculated_amount|intcomma }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Belum Input</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold py-3">Rp {{ invoice.electricity_bill_amount|intcomma }}</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 fs-5 fw-bold text-dark">Total Tagihan</td>
+                            <td class="text-end py-3 fs-4 fw-bold brand-font" style="color: var(--color-primary);">
+                                Rp {{ invoice.total_amount|intcomma }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="alert alert-light border d-flex align-items-center" role="alert">
+                    <i class="fas fa-calendar-alt text-danger me-3 fs-4"></i>
+                    <div>
+                        <small class="text-muted d-block">Jatuh Tempo</small>
+                        <strong class="text-danger">{{ invoice.due_date|date:"d F Y" }}</strong>
+                    </div>
+                </div>
+
+                <!-- Tombol Bukti Bayar (Jika Ada) -->
+                {% if invoice.payments.last %}
+                    <hr>
+                    <h6 class="fw-bold mb-3">Bukti Pembayaran Terakhir</h6>
+                    <div class="d-flex gap-2">
+                        <a href="{{ invoice.payments.last.payment_proof_file.url }}" target="_blank" class="btn btn-ink-outline w-100">
+                            <i class="fas fa-image me-2"></i> Lihat Foto Bukti
+                        </a>
+                        {% if invoice.status == 'MENUNGGU_VERIFIKASI' %}
+                            <a href="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" class="btn btn-ink w-100" style="background-color: var(--color-success);">
+                                <i class="fas fa-check me-2"></i> Terima
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    <!-- KOLOM KANAN: INPUT LISTRIK (FR-06) -->
+    <div class="col-md-5">
+        <div class="card-paper">
+            <div class="card-header-clean bg-light">
+                <h5 class="mb-0 brand-font"><i class="fas fa-bolt text-warning me-2"></i>Hitung Listrik</h5>
+            </div>
+            <div class="card-body-clean">
+                
+                {% if invoice.contract.room.is_token_electricity %}
+                    <!-- JIKA TOKEN (Listrik Prabayar) -->
+                    <div class="text-center py-5">
+                        <i class="fas fa-plug fa-3x text-muted mb-3 opacity-50"></i>
+                        <h6 class="fw-bold">Kamar ini menggunakan Token.</h6>
+                        <p class="text-muted small">Tidak perlu input meteran bulanan.</p>
+                    </div>
+                
+                {% else %}
+                    <!-- JIKA METERAN (Listrik Pascabayar) -->
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label-clean">Meteran Awal (KWH)</label>
+                            {{ form.meter_reading_start }}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label-clean">Meteran Akhir (KWH)</label>
+                            {{ form.meter_reading_end }}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label-clean">Tarif per KWH (Rp)</label>
+                            {{ form.rate_per_kwh }}
+                            <div class="form-text small">Default sesuai lokasi kost.</div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-ink">
+                                <i class="fas fa-calculator me-2"></i> Hitung & Simpan
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if electricity %}
+                        <div class="mt-4 p-3 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25">
+                            <h6 class="fw-bold text-warning mb-2">Hasil Perhitungan:</h6>
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span>Pemakaian:</span>
+                                <strong>{{ electricity.meter_reading_end|sub:electricity.meter_reading_start }} KWH</strong>
+                            </div>
+                            <div class="d-flex justify-content-between small border-top border-warning border-opacity-25 pt-1">
+                                <span>Biaya Tambahan:</span>
+                                <strong class="text-dark">Rp {{ electricity.calculated_amount|intcomma }}</strong>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Respon Laporan{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <!-- KOLOM KIRI: DETAIL LAPORAN -->
+    <div class="col-md-7 mb-4">
+        <div class="card-paper h-100">
+            <div class="card-header-clean d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 brand-font">Detail Kerusakan</h5>
+                <a href="{% url 'ticket_list' %}" class="btn btn-sm btn-light border">Kembali</a>
+            </div>
+            <div class="card-body-clean">
+                
+                <!-- Info Pelapor -->
+                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded-3">
+                    <div class="me-3 text-center">
+                        <i class="fas fa-user-circle fa-2x text-secondary"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-0">{{ ticket.contract.tenant.full_name }}</h6>
+                        <small class="text-muted">Kamar: {{ ticket.contract.room.room_number }}</small>
+                    </div>
+                </div>
+
+                <h4 class="mb-3">{{ ticket.title }}</h4>
+                
+                <div class="mb-4">
+                    <span class="text-muted small text-uppercase fw-bold">Deskripsi:</span>
+                    <p class="mt-1">{{ ticket.description|linebreaks }}</p>
+                </div>
+
+                <!-- Foto Bukti -->
+                {% if ticket.photo %}
+                    <div class="mb-3">
+                        <span class="text-muted small text-uppercase fw-bold d-block mb-2">Foto Bukti:</span>
+                        <a href="{{ ticket.photo.url }}" target="_blank">
+                            <img src="{{ ticket.photo.url }}" alt="Bukti" class="img-fluid rounded shadow-sm border" style="max-height: 400px;">
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="alert alert-secondary text-center small">Tidak ada foto bukti.</div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    <!-- KOLOM KANAN: AKSI ADMIN -->
+    <div class="col-md-5">
+        <div class="card-paper">
+            <div class="card-header-clean bg-light">
+                <h5 class="mb-0 brand-font"><i class="fas fa-tools text-primary me-2"></i>Tindak Lanjut</h5>
+            </div>
+            <div class="card-body-clean">
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label-clean">Update Status</label>
+                        <select name="status" class="form-select shadow-none p-3" style="border-color: var(--color-primary);">
+                            <option value="PENDING" {% if ticket.status == 'PENDING' %}selected{% endif %}>Menunggu Respon</option>
+                            <option value="PROSES" {% if ticket.status == 'PROSES' %}selected{% endif %}>Sedang Diperbaiki (Teknisi OTW)</option>
+                            <option value="SELESAI" {% if ticket.status == 'SELESAI' %}selected{% endif %}>Selesai / Beres</option>
+                            <option value="DITOLAK" {% if ticket.status == 'DITOLAK' %}selected{% endif %}>Tolak Laporan</option>
+                        </select>
+                    </div>
+
+                    <div class="alert alert-info small">
+                        <i class="fas fa-info-circle me-1"></i> Mengubah status menjadi <strong>Selesai</strong> atau <strong>Proses</strong> akan memberi tahu penghuni saat mereka cek di menu riwayat.
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-ink py-3 shadow-sm">
+                            <i class="fas fa-check-circle me-2"></i> Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+### Langkah 5: Update Sidebar (`base.html`)
+
+Terakhir, pasang link menu ini di sidebar agar Admin bisa mengaksesnya.
+
+Buka `templates/base.html`, cari link "Tagihan" atau "Operasional". Sisipkan link Maintenance ini di antaranya.
+
+```html
+<a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
+    <i class="fas fa-hammer nav-icon"></i> Maintenance
+</a>

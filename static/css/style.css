@@ -1,0 +1,189 @@
+/* static/css/style.css - THEME: PAPER & INK (Final) */
+
+/* --- 1. TYPOGRAPHY & IMPORTS --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap');
+
+:root {
+    /* --- COLOR PALETTE (The "Ink") --- */
+    /* Primary Brand: Deep Indigo (Trust, Professional) */
+    --color-primary: #4338CA;       /* Indigo 700 */
+    --color-primary-hover: #3730A3; /* Indigo 800 */
+    --color-primary-light: #E0E7FF; /* Indigo 100 */
+
+    /* Neutral / Base (The "Paper") */
+    --color-bg-body: #F3F4F6;       /* Cool Gray 100 */
+    --color-bg-card: #FFFFFF;       /* White */
+    --color-text-main: #111827;     /* Gray 900 (Hampir Hitam) */
+    --color-text-muted: #6B7280;    /* Gray 500 */
+    --color-border: #E5E7EB;        /* Gray 200 */
+
+    /* Status Colors (Pastel yet Bold) */
+    --color-success: #059669;       /* Emerald 600 */
+    --color-success-bg: #D1FAE5;    /* Emerald 100 */
+    --color-warning: #D97706;       /* Amber 600 */
+    --color-warning-bg: #FEF3C7;    /* Amber 100 */
+    --color-danger: #DC2626;        /* Red 600 */
+    --color-danger-bg: #FEE2E2;     /* Red 100 */
+}
+
+/* --- 2. GLOBAL RESET & BASE --- */
+body {
+    background-color: var(--color-bg-body);
+    color: var(--color-text-main);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased; /* Teks lebih tajam di Mac */
+    line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6, .brand-font {
+    font-family: 'Merriweather', serif; /* Kesan "Kop Surat" Resmi */
+    color: var(--color-text-main);
+    font-weight: 700;
+    letter-spacing: -0.02em; /* Sedikit rapat agar modern */
+}
+
+a { text-decoration: none; transition: all 0.2s ease; }
+
+/* --- 3. COMPONENTS: CARDS (The Paper) --- */
+.card-paper {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 12px; /* Sudut halus modern */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); /* Bayangan tipis melayang */
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-paper:hover {
+    /* Efek "terangkat" sedikit saat disentuh mouse */
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+}
+
+.card-header-clean {
+    background: var(--color-bg-card);
+    border-bottom: 1px solid var(--color-border);
+    padding: 1.25rem 1.5rem;
+}
+
+.card-body-clean {
+    padding: 1.5rem;
+}
+
+/* --- 4. COMPONENTS: BUTTONS (The Action) --- */
+.btn-ink {
+    background-color: var(--color-primary);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.3); /* Bayangan Indigo */
+}
+
+.btn-ink:hover {
+    background-color: var(--color-primary-hover);
+    transform: translateY(-1px);
+    color: #fff;
+}
+
+.btn-ink-outline {
+    background-color: transparent;
+    border: 2px solid var(--color-border);
+    color: var(--color-text-main);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+}
+
+.btn-ink-outline:hover {
+    border-color: var(--color-text-main);
+    background-color: var(--color-text-main);
+    color: #fff;
+}
+
+/* --- 5. COMPONENTS: BADGES (The Status) --- */
+.badge-pill {
+    padding: 0.35em 0.8em;
+    font-size: 0.75em;
+    font-weight: 700;
+    border-radius: 9999px; /* Pil Bulat Penuh */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-success { background: var(--color-success-bg); color: var(--color-success); }
+.badge-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-danger  { background: var(--color-danger-bg); color: var(--color-danger); }
+
+/* --- 6. COMPONENTS: FORMS --- */
+.form-control-clean {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-control-clean:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.form-label-clean {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-main);
+    margin-bottom: 0.5rem;
+}
+
+/* --- 7. LAYOUT: SIDEBAR (CLEAN & WHITE) --- */
+.sidebar-clean {
+    background-color: var(--color-bg-card);
+    border-right: 1px solid var(--color-border);
+    min-height: 100vh;
+}
+
+.sidebar-brand {
+    padding: 2rem 1.5rem;
+    font-size: 1.5rem;
+    color: var(--color-primary);
+    border-bottom: 1px solid var(--color-border);
+    text-align: center;
+}
+
+.nav-link-clean {
+    display: flex;
+    align-items: center;
+    padding: 0.875rem 1.5rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+    border-left: 4px solid transparent; /* Indikator aktif tersembunyi */
+    text-decoration: none; /* Hapus garis bawah */
+}
+
+.nav-link-clean:hover {
+    background-color: var(--color-bg-body);
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.nav-link-clean.active {
+    background-color: var(--color-primary-light);
+    color: var(--color-primary);
+    border-left-color: var(--color-primary); /* Indikator aktif muncul */
+    font-weight: 600;
+}
+
+.nav-icon {
+    width: 24px;
+    margin-right: 12px;
+    text-align: center;
+}
+
+.bg-light-gray {
+    background-color: #F3F4F6 !important; /* Abu-abu muda elegan */
+}

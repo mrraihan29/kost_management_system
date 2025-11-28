@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Status Laporan{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 800px;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="brand-font mb-0" style="color: var(--color-primary);">Status Laporan</h2>
+        <a href="{% url 'public_report_create' %}" class="btn btn-ink shadow-sm">
+            <i class="fas fa-plus me-2"></i>Buat Baru
+        </a>
+    </div>
+
+    {% for ticket in tickets %}
+    <div class="card-paper mb-3">
+        <div class="card-body-clean">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h5 class="fw-bold text-dark mb-1">{{ ticket.title }}</h5>
+                    <p class="text-muted small mb-2">{{ ticket.created_at|date:"d M Y, H:i" }}</p>
+                    
+                    <!-- Badge Status -->
+                    {% if ticket.status == 'PENDING' %}
+                        <span class="badge bg-secondary">Menunggu Respon</span>
+                    {% elif ticket.status == 'PROSES' %}
+                        <span class="badge bg-warning text-dark">Sedang Diperbaiki</span>
+                    {% elif ticket.status == 'SELESAI' %}
+                        <span class="badge bg-success">Selesai</span>
+                    {% endif %}
+
+                    <!-- Badge Priority -->
+                    {% if ticket.priority == 'HIGH' %}
+                        <span class="badge bg-danger ms-1">Darurat</span>
+                    {% endif %}
+                </div>
+                
+                {% if ticket.photo %}
+                    <a href="{{ ticket.photo.url }}" target="_blank" class="ms-3">
+                        <img src="{{ ticket.photo.url }}" alt="Bukti" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #eee;">
+                    </a>
+                {% endif %}
+            </div>
+            
+            <div class="mt-3 p-3 bg-light rounded-3 small text-secondary">
+                {{ ticket.description|linebreaks }}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-clipboard-check fa-3x mb-3 opacity-25"></i>
+        <p>Belum ada laporan kerusakan.</p>
+    </div>
+    {% endfor %}
+
+    <div class="text-center mt-4">
+        <a href="{% url 'public_payment_step2' %}" class="btn btn-outline-secondary btn-sm">Kembali ke Menu Utama</a>
+    </div>
+</div>
+{% endblock %}

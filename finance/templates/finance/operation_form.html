@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Catat Pengeluaran{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="brand-font mb-0" style="color: var(--color-text-main);">Catat Pengeluaran</h2>
+            <a href="{% url 'operation_list' %}" class="btn btn-sm btn-ink-outline">
+                <i class="fas fa-arrow-left me-1"></i> Kembali
+            </a>
+        </div>
+
+        <div class="card-paper">
+            <div class="card-body-clean">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger small rounded-3 mb-4">Harap lengkapi data dengan benar.</div>
+                    {% endif %}
+
+                    <!-- Lokasi & Kategori -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label-clean">Lokasi Kost</label>
+                            {{ form.kost_location }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label-clean">Kategori</label>
+                            {{ form.category }}
+                        </div>
+                    </div>
+
+                    <!-- Tanggal & Jumlah -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label-clean">Tanggal Nota</label>
+                            {{ form.incurred_date }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label-clean">Jumlah (Rp)</label>
+                            {{ form.amount }}
+                        </div>
+                    </div>
+
+                    <!-- Keterangan -->
+                    <div class="mb-3">
+                        <label class="form-label-clean">Keterangan Detail</label>
+                        {{ form.description }}
+                    </div>
+
+                    <!-- Upload -->
+                    <div class="mb-4">
+                        <label class="form-label-clean">Foto Nota (Wajib)</label>
+                        {{ form.proof_file }}
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-ink py-3 shadow-sm">
+                            <i class="fas fa-save me-2"></i> Simpan Pengeluaran
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
