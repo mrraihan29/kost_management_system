@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Laporan Keuangan{% endblock %}
+
+{% block content %}
+<!-- HEADER & FILTER -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Laporan Keuangan</h2>
+        <p class="text-muted small mb-0">Analisis: <strong>{{ location_label }} - Tahun {{ year }}</strong></p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'export_finance_excel' %}?year={{ year }}&kost_location={{ form.kost_location.value|default:'' }}" class="btn btn-success shadow-sm">
+            <i class="fas fa-file-excel me-2"></i>Download Excel (.xlsx)
+        </a>
+    </div>
+</div>
+
+<!-- FILTER CARD -->
+<div class="card-paper mb-4 bg-light">
+    <div class="card-body-clean py-3">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="small fw-bold text-muted mb-1">Tahun Laporan</label>
+                {{ form.year }}
+            </div>
+            <!-- Tampilkan Lokasi hanya jika Superuser -->
+            {% if request.user.is_superuser %}
+            <div class="col-md-4">
+                <label class="small fw-bold text-muted mb-1">Lokasi Kost</label>
+                {{ form.kost_location }}
+            </div>
+            {% endif %}
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Terapkan Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- RINGKASAN BIG NUMBERS -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card-paper p-4 border-start border-4 border-success h-100">
+            <h6 class="text-muted text-uppercase small fw-bold">Pemasukan (Omzet)</h6>
+            <h2 class="text-success fw-bold mb-0">Rp {{ total_income|intcomma }}</h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-paper p-4 border-start border-4 border-danger h-100">
+            <h6 class="text-muted text-uppercase small fw-bold">Pengeluaran (Op)</h6>
+            <h2 class="text-danger fw-bold mb-0">Rp {{ total_expense|intcomma }}</h2>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-paper p-4 border-start border-4 border-primary h-100">
+            <h6 class="text-muted text-uppercase small fw-bold">Profit Bersih</h6>
+            <h2 class="text-primary fw-bold mb-0">Rp {{ net_profit|intcomma }}</h2>
+        </div>
+    </div>
+</div>
+
+<!-- GRAFIK VISUALISASI -->
+<div class="row g-4 mb-5">
+    <!-- GRAFIK 1: Trend Bulanan (Bar Chart) -->
+    <div class="col-md-8">
+        <div class="card-paper h-100">
+            <div class="card-header-clean">
+                <h5 class="mb-0 brand-font fs-6"><i class="fas fa-chart-bar me-2 text-muted"></i>Arus Kas Bulanan</h5>
+            </div>
+            <div class="card-body-clean">
+                <canvas id="trendChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- GRAFIK 2: Komposisi Pengeluaran (Doughnut Chart) -->
+    <div class="col-md-4">
+        <div class="card-paper h-100">
+            <div class="card-header-clean">
+                <h5 class="mb-0 brand-font fs-6"><i class="fas fa-chart-pie me-2 text-muted"></i>Breakdown Biaya</h5>
+            </div>
+            <div class="card-body-clean d-flex align-items-center justify-content-center">
+                <div style="width: 100%; max-width: 250px;">
+                    <canvas id="expenseChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPT CHART.JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 1. DATA CHART TREND
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [
+                {
+                    label: 'Pemasukan',
+                    data: {{ chart_income|safe }},
+                    backgroundColor: '#386641', // Hijau EKM
+                    borderRadius: 4
+                },
+                {
+                    label: 'Pengeluaran',
+                    data: {{ chart_expense|safe }},
+                    backgroundColor: '#BC4749', // Merah EKM
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } }
+        }
+    });
+
+    // 2. DATA CHART PIE (PENGELUARAN)
+    const ctxExpense = document.getElementById('expenseChart').getContext('2d');
+    const pieData = {{ pie_data|safe }};
+    
+    if (pieData.length > 0) {
+        new Chart(ctxExpense, {
+            type: 'doughnut',
+            data: {
+                labels: {{ pie_labels|safe }},
+                datasets: [{
+                    data: pieData,
+                    backgroundColor: ['#BC4749', '#DDA15E', '#6A994E', '#386641', '#111827'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { 
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } 
+                }
+            }
+        });
+    } else {
+        // Tampilkan pesan jika tidak ada data
+        document.getElementById('expenseChart').parentElement.innerHTML = "<p class='text-muted text-center small my-5'>Belum ada data pengeluaran.</p>";
+    }
+</script>
+{% endblock %}

@@ -5,17 +5,35 @@
 
 {% block content %}
 <!-- HEADER DASHBOARD -->
-<div class="d-flex justify-content-between align-items-end mb-5">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-end mb-5">
     <div>
-        <h6 class="text-muted text-uppercase fw-bold mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">Pusat Kendali</h6>
+        <h6 class="text-muted text-uppercase ls-1 mb-1" style="font-size: 0.75rem; letter-spacing: 1px;">Pusat Kendali</h6>
         <h2 class="brand-font mb-0" style="color: var(--color-text-main);">Dashboard {{ location_name }}</h2>
     </div>
-    <div class="text-end d-none d-md-block">
-        <div class="d-inline-flex align-items-center px-3 py-2 bg-white border rounded-pill shadow-sm">
-            <i class="fas fa-user-circle text-muted me-2"></i>
-            <span class="fw-bold small" style="color: var(--color-primary);">{{ request.user.username }}</span>
+    
+    <div class="d-flex align-items-center gap-3">
+        <!-- FILTER LOKASI (HANYA SUPERUSER) -->
+        {% if request.user.is_superuser %}
+        <form method="get" class="d-flex align-items-center bg-white p-1 rounded shadow-sm border">
+            <i class="fas fa-filter text-muted ms-2 me-2"></i>
+            <select name="location" class="form-select border-0 shadow-none py-1 pe-4" style="min-width: 150px; font-size: 0.9rem;" onchange="this.form.submit()">
+                <option value="">-- Semua Lokasi --</option>
+                {% for loc in all_locations %}
+                    <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
+                        {{ loc.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+
+        <!-- Info User -->
+        <div class="text-end d-none d-md-block ms-2">
+            <span class="badge-pill badge-success">
+                <i class="fas fa-user-shield me-1"></i> {{ request.user.username }}
+            </span>
+            <div class="small text-muted mt-1">{% now "d F Y" %}</div>
         </div>
-        <div class="small text-muted mt-2 text-end">{% now "l, d F Y" %}</div>
     </div>
 </div>
 

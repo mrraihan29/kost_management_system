@@ -46,6 +46,9 @@
                 <a href="{% url 'operation_list' %}" class="nav-link-clean {% if 'operation' in request.path %}active{% endif %}">
                     <i class="fas fa-tools nav-icon"></i> Operasional
                 </a>
+                <a href="{% url 'finance_report' %}" class="nav-link-clean {% if 'report' in request.path %}active{% endif %}">
+                    <i class="fas fa-chart-pie nav-icon"></i> Laporan
+                </a>
                 <a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
                     <i class="fas fa-hammer nav-icon"></i> Maintenance
                 </a>

@@ -10,6 +10,15 @@ from django.db.models import Q, Sum
 from django.http import HttpResponseForbidden
 from .forms import MaintenanceForm
 from tenants.models import MaintenanceTicket
+import csv
+import datetime
+from django.http import HttpResponse
+from django.db.models import Sum, Count
+from django.db.models.functions import TruncMonth
+import openpyxl # Library Excel
+from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from .forms import ReportFilterForm # Import form baru
 
 def public_payment_step1(request):
     """
@@ -162,20 +171,29 @@ def verify_payment(request, payment_id, action):
 @login_required(login_url='/accounts/login/')
 def invoice_list(request):
     """
-    Halaman Daftar Semua Tagihan (Admin)
+    Halaman Daftar Semua Tagihan (Admin) - FIXED SECURITY
     """
-    # Ambil parameter filter dari URL
     status_filter = request.GET.get('status')
     search_query = request.GET.get('q')
 
-    # Base Query: Urutkan dari yang terbaru (Jatuh tempo desc)
+    # 1. Base Query
     invoices = Invoice.objects.all().order_by('-due_date')
 
-    # 1. Filter by Status (jika ada)
+    # 2. SECURITY FILTER (BUG FIX)
+    # Admin biasa HANYA boleh melihat tagihan di lokasinya
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            user_location = request.user.admin_profile.assigned_location
+            invoices = invoices.filter(contract__room__kost_location=user_location)
+        else:
+            # Admin tanpa lokasi = tidak lihat apa-apa
+            invoices = invoices.none()
+
+    # 3. Filter by Status
     if status_filter:
         invoices = invoices.filter(status=status_filter)
 
-    # 2. Search by Nama Penghuni / No Kamar
+    # 4. Search
     if search_query:
         invoices = invoices.filter(
             Q(contract__tenant__full_name__icontains=search_query) |
@@ -384,3 +402,171 @@ def admin_ticket_update(request, pk):
             return redirect('ticket_list')
 
     return render(request, 'finance/ticket_detail.html', {'ticket': ticket})
+
+@login_required(login_url='/accounts/login/')
+def finance_report(request):
+    """
+    Dashboard Analisis Keuangan (Multi-Chart & Filter)
+    """
+    # 1. Handle Filter
+    current_year = datetime.datetime.now().year
+    form = ReportFilterForm(request.GET or {'year': current_year})
+    
+    selected_year = current_year
+    selected_location = None
+
+    if form.is_valid():
+        selected_year = int(form.cleaned_data['year'])
+        selected_location = form.cleaned_data['kost_location']
+
+    # 2. Base Query
+    invoices = Invoice.objects.filter(billing_period_start__year=selected_year, status='LUNAS')
+    costs = OperationCost.objects.filter(incurred_date__year=selected_year)
+
+    # Filter Lokasi (Logic Security + Logic Pilihan User)
+    location_label = "Semua Lokasi"
+    
+    if not request.user.is_superuser:
+        # Jika Admin biasa, paksa filter ke lokasinya
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            user_loc = request.user.admin_profile.assigned_location
+            invoices = invoices.filter(contract__room__kost_location=user_loc)
+            costs = costs.filter(kost_location=user_loc)
+            location_label = user_loc.name
+            # Hide field lokasi di form nanti via template logic
+    elif selected_location:
+        # Jika Superuser memilih lokasi tertentu
+        invoices = invoices.filter(contract__room__kost_location=selected_location)
+        costs = costs.filter(kost_location=selected_location)
+        location_label = selected_location.name
+
+    # 3. Aggregasi Bulanan (Untuk Grafik Trend)
+    monthly_data = []
+    total_income = 0
+    total_expense = 0
+
+    for month in range(1, 13):
+        income = invoices.filter(billing_period_start__month=month).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        expense = costs.filter(incurred_date__month=month).aggregate(Sum('amount'))['amount__sum'] or 0
+        profit = income - expense
+        
+        monthly_data.append({
+            'month_name': datetime.date(1900, month, 1).strftime('%B'),
+            'income': float(income),
+            'expense': float(expense),
+            'profit': float(profit)
+        })
+        total_income += income
+        total_expense += expense
+
+    # 4. Aggregasi Kategori Pengeluaran (Untuk Pie Chart)
+    # Contoh: Listrik: 5jt, Air: 1jt
+    expense_breakdown = costs.values('category').annotate(total=Sum('amount')).order_by('-total')
+    
+    # Siapkan data JSON untuk Chart.js
+    chart_labels = [d['month_name'] for d in monthly_data]
+    chart_income = [d['income'] for d in monthly_data]
+    chart_expense = [d['expense'] for d in monthly_data]
+    
+    pie_labels = [item['category'] for item in expense_breakdown]
+    pie_data = [float(item['total']) for item in expense_breakdown]
+
+    context = {
+        'form': form,
+        'year': selected_year,
+        'location_label': location_label,
+        'total_income': total_income,
+        'total_expense': total_expense,
+        'net_profit': total_income - total_expense,
+        'monthly_data': monthly_data,
+        # Data Charts
+        'chart_labels': chart_labels,
+        'chart_income': chart_income,
+        'chart_expense': chart_expense,
+        'pie_labels': pie_labels,
+        'pie_data': pie_data,
+    }
+    return render(request, 'finance/report_dashboard.html', context)
+
+@login_required(login_url='/accounts/login/')
+def export_finance_excel(request):
+    """
+    Export Excel Professional (.xlsx) dengan Multiple Sheets
+    """
+    # ... (Ambil logika filter yang SAMA PERSIS dengan finance_report di atas) ...
+    # Agar kode singkat, saya asumsikan variabel 'invoices' dan 'costs' sudah terfilter
+    # (Dalam praktek nyata, sebaiknya buat service function agar tidak copy-paste logic)
+    
+    # --- REPEAT LOGIC FILTER (Singkat) ---
+    year = int(request.GET.get('year', datetime.datetime.now().year))
+    loc_id = request.GET.get('kost_location')
+    
+    invoices = Invoice.objects.filter(billing_period_start__year=year, status='LUNAS')
+    costs = OperationCost.objects.filter(incurred_date__year=year)
+    
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            loc = request.user.admin_profile.assigned_location
+            invoices = invoices.filter(contract__room__kost_location=loc)
+            costs = costs.filter(kost_location=loc)
+    elif loc_id:
+        invoices = invoices.filter(contract__room__kost_location_id=loc_id)
+        costs = costs.filter(kost_location_id=loc_id)
+    # -------------------------------------
+
+    # SETUP WORKBOOK
+    wb = openpyxl.Workbook()
+    
+    # --- SHEET 1: RINGKASAN ---
+    ws1 = wb.active
+    ws1.title = "Ringkasan Bulanan"
+    
+    # Header Style
+    font_bold = Font(bold=True)
+    headers = ['Bulan', 'Pemasukan', 'Pengeluaran', 'Profit Bersih']
+    ws1.append(headers)
+    for cell in ws1[1]: cell.font = font_bold
+
+    # Isi Data
+    for month in range(1, 13):
+        income = invoices.filter(billing_period_start__month=month).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        expense = costs.filter(incurred_date__month=month).aggregate(Sum('amount'))['amount__sum'] or 0
+        profit = income - expense
+        month_name = datetime.date(1900, month, 1).strftime('%B')
+        ws1.append([month_name, income, expense, profit])
+
+    # --- SHEET 2: DETAIL PEMASUKAN ---
+    ws2 = wb.create_sheet(title="Rincian Pemasukan")
+    ws2.append(['Tanggal', 'Penghuni', 'Kamar', 'Jumlah', 'Admin Verifikasi'])
+    for cell in ws2[1]: cell.font = font_bold
+    
+    for inv in invoices.order_by('billing_period_start'):
+        # Ambil admin yang verifikasi pembayaran terakhir
+        verifier = inv.payments.last().verified_by.username if inv.payments.exists() and inv.payments.last().verified_by else "-"
+        ws2.append([
+            inv.billing_period_start,
+            inv.contract.tenant.full_name,
+            inv.contract.room.room_number,
+            inv.total_amount,
+            verifier
+        ])
+
+    # --- SHEET 3: DETAIL PENGELUARAN ---
+    ws3 = wb.create_sheet(title="Rincian Operasional")
+    ws3.append(['Tanggal', 'Kategori', 'Keterangan', 'Jumlah', 'Admin'])
+    for cell in ws3[1]: cell.font = font_bold
+
+    for cost in costs.order_by('incurred_date'):
+        ws3.append([
+            cost.incurred_date,
+            cost.get_category_display(),
+            cost.description,
+            cost.amount,
+            cost.admin.username if cost.admin else "-"
+        ])
+
+    # RESPONSE
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Laporan_Keuangan_EKM_{year}.xlsx"'
+    wb.save(response)
+    return response

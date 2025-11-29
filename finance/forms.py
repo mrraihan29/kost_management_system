@@ -2,6 +2,7 @@ from django import forms
 from core.models import KostLocation
 from .models import Payment, ElectricityReading, OperationCost
 from tenants.models import MaintenanceTicket
+import datetime
 class PinValidationForm(forms.Form):
     """
     Formulir Langkah 1: Validasi Penghuni
@@ -96,3 +97,16 @@ class MaintenanceForm(forms.ModelForm):
             'description': 'Keterangan',
             'photo': 'Foto Kerusakan (Wajib)',
         }
+        
+class ReportFilterForm(forms.Form):
+    current_year = datetime.datetime.now().year
+    YEAR_CHOICES = [(r, str(r)) for r in range(current_year, current_year - 5, -1)] # 5 Tahun ke belakang
+    year = forms.ChoiceField(choices=YEAR_CHOICES, label="Tahun", widget=forms.Select(attrs={'class': 'form-select shadow-none border-secondary'}))
+    
+    kost_location = forms.ModelChoiceField(
+        queryset=KostLocation.objects.all(), 
+        required=False, 
+        label="Filter Lokasi (Opsional)",
+        empty_label="-- Semua Lokasi --",
+        widget=forms.Select(attrs={'class': 'form-select shadow-none border-secondary'})
+    )
