@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
-
+import os
+import dj_database_url # Import baru untuk database URL
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -25,7 +26,11 @@ SECRET_KEY = 'django-insecure-s(5rwmia#0p+god3f3&f!506gc3f@a!%pt6*-^b2rm05t&^36v
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Izinkan semua host sementara (agar tidak error 400 di server)
+ALLOWED_HOSTS = ['*'] 
+
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = ['https://*.web.id', 'https://*.coolify.io']
 
 
 # Application definition
@@ -46,6 +51,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -78,12 +84,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+
+# Default: Pakai SQLite (Laptop)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# TAPI, jika ada environment variable DATABASE_URL (dari Coolify), pakai PostgreSQL!
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
 
 
 # Password validation
@@ -130,14 +143,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Menggunakan Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
-import os
 
 # Konfigurasi Static Files (CSS, JS)
 STATIC_URL = 'static/'
-import os
+
+# Folder tempat mengumpulkan static files saat deploy
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Folder tempat kita menaruh CSS custom (yang sudah ada)
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
+
+# Aktifkan kompresi dan caching otomatis Whitenoise
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Konfigurasi Media Files (Upload User: KTP, Bukti Bayar)
 MEDIA_URL = '/media/'
