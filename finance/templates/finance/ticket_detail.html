@@ -27,6 +27,16 @@
 
                 <h4 class="mb-3">{{ ticket.title }}</h4>
                 
+                {% if ticket.status == 'SELESAI' and ticket.completion_date %}
+                    <div class="alert alert-success d-flex align-items-center mb-4">
+                        <i class="fas fa-check-circle fs-4 me-3"></i>
+                        <div>
+                            <div class="small text-uppercase fw-bold opacity-75">Masalah Terselesaikan Pada:</div>
+                            <div class="fw-bold">{{ ticket.completion_date|date:"l, d F Y - H:i" }}</div>
+                        </div>
+                    </div>
+                {% endif %}
+
                 <div class="mb-4">
                     <span class="text-muted small text-uppercase fw-bold">Deskripsi:</span>
                     <p class="mt-1">{{ ticket.description|linebreaks }}</p>
@@ -85,17 +95,3 @@
     </div>
 </div>
 {% endblock %}
-```
-
----
-
-### Langkah 5: Update Sidebar (`base.html`)
-
-Terakhir, pasang link menu ini di sidebar agar Admin bisa mengaksesnya.
-
-Buka `templates/base.html`, cari link "Tagihan" atau "Operasional". Sisipkan link Maintenance ini di antaranya.
-
-```html
-<a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
-    <i class="fas fa-hammer nav-icon"></i> Maintenance
-</a>

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Tambah Staff{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="brand-font mb-0" style="color: var(--color-text-main);">Tambah Admin</h2>
+            <a href="{% url 'staff_list' %}" class="btn btn-sm btn-ink-outline">Kembali</a>
+        </div>
+
+        <div class="card-paper">
+            <div class="card-body-clean">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger small rounded-3 mb-4">
+                            Ada kesalahan pada form. Pastikan password sesuai standar keamanan.
+                        </div>
+                    {% endif %}
+
+                    <!-- Loop Field Form -->
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label-clean">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}
+                                <div class="form-text small text-muted">{{ field.help_text }}</div>
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-ink py-3 shadow-sm">
+                            <i class="fas fa-user-check me-2"></i> Simpan Staff Baru
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+```
+
+---
+
+### Langkah 5: Update Sidebar (`base.html`)
+
+Menu ini hanya boleh dilihat oleh **Superuser**. Admin biasa tidak boleh melihatnya.
+
+Buka `templates/base.html`. Tambahkan kode ini di bagian bawah menu list (sebelum tombol Logout):
+
+```html
+<!-- ... menu tagihan ... -->
+
+<!-- MENU KHUSUS SUPER ADMIN -->
+{% if user.is_superuser %}
+    <div class="mt-4 mb-2 ps-3 small text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">
+        Super Admin
+    </div>
+    <a href="{% url 'staff_list' %}" class="nav-link-clean {% if 'staff' in request.path %}active{% endif %}">
+        <i class="fas fa-user-tie nav-icon"></i> Kelola Staff
+    </a>
+{% endif %}
+
+<!-- ... tombol logout ... -->

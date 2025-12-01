@@ -52,7 +52,23 @@
                 <a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
                     <i class="fas fa-hammer nav-icon"></i> Maintenance
                 </a>
+                <a href="{% url 'location_list' %}" class="nav-link-clean {% if 'settings' in request.path %}active{% endif %}">
+                    <i class="fas fa-cog nav-icon"></i> Pengaturan
+                </a>
+                <a href="{% url 'password_change' %}" class="nav-link-clean {% if 'password' in request.path %}active{% endif %}">
+                    <i class="fas fa-lock nav-icon"></i> Ganti Password
+                </a>
             </div>
+
+            {% if user.is_superuser %}
+                <div class="mt-4 mb-2 ps-3 small text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">
+                    Super Admin
+                </div>
+                <a href="{% url 'staff_list' %}" class="nav-link-clean {% if 'staff' in request.path %}active{% endif %}">
+                    <i class="fas fa-user-tie nav-icon"></i> Kelola Staff
+                </a>
+            {% endif %}
+            
 
             <!-- Tombol Logout (Di Bawah) -->
             <div class="p-3 border-top">

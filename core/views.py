@@ -1,10 +1,11 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from finance.models import Invoice, Payment
 from tenants.models import TenantContract
 from core.models import Room, KostLocation
 from django.db.models import Sum
-
+from .forms import KostLocationForm
+from django.contrib import messages
 # --- VIEW 1: LANDING PAGE (YANG HILANG) ---
 def home(request):
     """
@@ -109,3 +110,45 @@ def admin_dashboard(request):
         'selected_location_id': int(selected_location_id) if selected_location_id else None
     }
     return render(request, 'core/dashboard.html', context)
+
+@login_required(login_url='/accounts/login/')
+def location_list(request):
+    """
+    Halaman Daftar Lokasi (Hanya untuk Superuser)
+    """
+    if not request.user.is_superuser:
+        # Jika admin biasa coba akses list, lempar langsung ke edit punya dia
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            return redirect('location_update', pk=request.user.admin_profile.assigned_location.id)
+        else:
+            return redirect('dashboard') # Admin tanpa lokasi
+
+    locations = KostLocation.objects.all()
+    return render(request, 'core/location_list.html', {'locations': locations})
+
+@login_required(login_url='/accounts/login/')
+def location_update(request, pk):
+    """
+    Halaman Edit Lokasi & Tarif
+    """
+    location = get_object_or_404(KostLocation, pk=pk)
+
+    # Security Check: Admin biasa dilarang edit lokasi orang lain
+    if not request.user.is_superuser:
+        if not hasattr(request.user, 'admin_profile') or request.user.admin_profile.assigned_location != location:
+            messages.error(request, "Anda tidak memiliki akses untuk mengubah pengaturan lokasi ini.")
+            return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = KostLocationForm(request.POST, instance=location)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Pengaturan '{location.name}' berhasil diperbarui.")
+            # Kembali ke halaman yang sesuai role
+            if request.user.is_superuser:
+                return redirect('location_list')
+            return redirect('dashboard')
+    else:
+        form = KostLocationForm(instance=location)
+
+    return render(request, 'core/location_form.html', {'form': form, 'location': location})

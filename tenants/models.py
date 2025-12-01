@@ -85,6 +85,8 @@ class MaintenanceTicket(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True) # Kapan status terakhir berubah
+    
+    completion_date = models.DateTimeField(null=True, blank=True, verbose_name="Tanggal Selesai")
 
     def __str__(self):
         return f"Tiket #{self.id}: {self.title}"

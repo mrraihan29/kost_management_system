@@ -24,19 +24,20 @@ from core.views import home
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home, name='home'),
-    # URL Login Custom (Mengarah ke template baru kita)
         path('accounts/login/', auth_views.LoginView.as_view(
         template_name='auth/login.html',
-        extra_context={'hide_sidebar': True}  # <--- INI KUNCINYA
+        extra_context={'hide_sidebar': True} 
     ), name='login'),
-    # URL Logout (Redirect ke login lagi setelah logout)
     
     path('accounts/logout/', auth_views.LogoutView.as_view(next_page='/accounts/login/'), name='logout'),
     path('', include('finance.urls')),
-    path('staff/', include('core.urls')), # Dashboard ada di /staff/dashboard/
-        # TAMBAHKAN INI:
+    path('staff/', include('core.urls')),
     path('staff/tenants/', include('tenants.urls')), 
-]
+    path('management/', include('users.urls')), 
+    path('accounts/password_change/', auth_views.PasswordChangeView.as_view(template_name='auth/password_change.html'), name='password_change'),
+    path('accounts/password_change/done/', auth_views.PasswordChangeDoneView.as_view(template_name='auth/password_change_done.html'), name='password_change_done'),
+
+]   
 
 # Tambahkan baris ini untuk melayani file media saat development
 if settings.DEBUG:

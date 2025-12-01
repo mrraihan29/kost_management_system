@@ -19,6 +19,9 @@ import openpyxl # Library Excel
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from .forms import ReportFilterForm # Import form baru
+from dateutil.relativedelta import relativedelta # Pastikan ini ada
+from django.utils import timezone
+from tenants.models import TenantContract
 
 def public_payment_step1(request):
     """
@@ -365,31 +368,47 @@ def public_report_list(request):
 @login_required(login_url='/accounts/login/')
 def admin_ticket_list(request):
     """
-    Daftar Semua Laporan Kerusakan (Admin)
+    Daftar Laporan Kerusakan (Dengan Filter Status & Kamar)
     """
+    # 1. Base Query
     tickets = MaintenanceTicket.objects.all().order_by('-created_at')
+    
+    # 2. Ambil Daftar Kamar untuk Dropdown Filter
+    # (Hanya tampilkan kamar yang ada di lokasi admin tersebut)
+    rooms = Room.objects.all().order_by('room_number')
 
-    # Security: Filter Lokasi
+    # 3. Security Filter (Lokasi)
     if not request.user.is_superuser:
         if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
-            tickets = tickets.filter(contract__room__kost_location=request.user.admin_profile.assigned_location)
+            user_loc = request.user.admin_profile.assigned_location
+            tickets = tickets.filter(contract__room__kost_location=user_loc)
+            rooms = rooms.filter(kost_location=user_loc)
         else:
             tickets = tickets.none()
+            rooms = rooms.none()
 
-    # Filter Status (Opsional, via URL ?status=PENDING)
+    # 4. Filter Status (URL ?status=...)
     status_filter = request.GET.get('status')
     if status_filter:
         tickets = tickets.filter(status=status_filter)
 
-    return render(request, 'finance/ticket_list.html', {
+    # 5. Filter Kamar (URL ?room=ID) - FITUR BARU
+    room_filter = request.GET.get('room')
+    if room_filter:
+        tickets = tickets.filter(contract__room_id=room_filter)
+
+    context = {
         'tickets': tickets,
-        'current_status': status_filter
-    })
+        'rooms': rooms,
+        'current_status': status_filter,
+        'current_room': int(room_filter) if room_filter else None
+    }
+    return render(request, 'finance/ticket_list.html', context)
 
 @login_required(login_url='/accounts/login/')
 def admin_ticket_update(request, pk):
     """
-    Halaman Detail & Update Status Tiket
+    Update Status Tiket & Catat Tanggal Selesai
     """
     ticket = get_object_or_404(MaintenanceTicket, pk=pk)
 
@@ -397,8 +416,16 @@ def admin_ticket_update(request, pk):
         new_status = request.POST.get('status')
         if new_status:
             ticket.status = new_status
+            
+            # LOGIKA BARU: Jika Selesai, catat waktunya
+            if new_status == 'SELESAI':
+                ticket.completion_date = timezone.now()
+            elif new_status != 'SELESAI':
+                # Jika status dikembalikan ke Proses/Pending, hapus tanggal selesainya
+                ticket.completion_date = None
+                
             ticket.save()
-            messages.success(request, f"Status laporan '{ticket.title}' berhasil diperbarui.")
+            messages.success(request, f"Status laporan '{ticket.title}' diperbarui.")
             return redirect('ticket_list')
 
     return render(request, 'finance/ticket_detail.html', {'ticket': ticket})
@@ -570,3 +597,59 @@ def export_finance_excel(request):
     response['Content-Disposition'] = f'attachment; filename="Laporan_Keuangan_EKM_{year}.xlsx"'
     wb.save(response)
     return response
+
+@login_required(login_url='/accounts/login/')
+def generate_invoices_bulk(request):
+    """
+    Fitur: Generate Tagihan Massal via Tombol Dashboard
+    """
+    if request.method == 'POST':
+        # 1. Tentukan Periode (Logika: Bulan Depan dari Hari Ini)
+        # Kenapa bulan depan? Karena biasanya admin menyiapkan tagihan sebelum bulan berjalan.
+        today = timezone.now().date()
+        next_month = today + relativedelta(months=1)
+        billing_start_base = next_month.replace(day=1) # Tgl 1 Bulan Depan
+        
+        # 2. Ambil semua kontrak aktif
+        active_contracts = TenantContract.objects.filter(is_active=True)
+        created_count = 0
+        skipped_count = 0
+
+        for contract in active_contracts:
+            # Sesuaikan tanggal mulai tagihan dengan tanggal masuk penghuni
+            # Contoh: Masuk tgl 15, maka periode mulai tgl 15 bulan depan
+            try:
+                billing_start = billing_start_base.replace(day=contract.start_date.day)
+            except ValueError:
+                # Fallback untuk tanggal 31 di bulan Februari, dll.
+                billing_start = billing_start_base.replace(day=28)
+            
+            # Jatuh tempo H+10
+            due_date = billing_start + relativedelta(days=10)
+
+            # Cek apakah sudah ada tagihan di periode tersebut?
+            exists = Invoice.objects.filter(
+                contract=contract,
+                billing_period_start=billing_start
+            ).exists()
+
+            if not exists:
+                Invoice.objects.create(
+                    contract=contract,
+                    billing_period_start=billing_start,
+                    due_date=due_date,
+                    base_rent_amount=contract.monthly_rent_amount,
+                    electricity_bill_amount=0,
+                    total_amount=contract.monthly_rent_amount,
+                    status='BELUM_LUNAS'
+                )
+                created_count += 1
+            else:
+                skipped_count += 1
+
+        if created_count > 0:
+            messages.success(request, f"Berhasil membuat {created_count} tagihan baru untuk periode {billing_start_base.strftime('%B %Y')}.")
+        else:
+            messages.info(request, f"Tidak ada tagihan baru. {skipped_count} tagihan sudah tersedia.")
+            
+    return redirect('invoice_list')

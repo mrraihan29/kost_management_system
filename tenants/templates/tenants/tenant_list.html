@@ -11,7 +11,7 @@
         <p class="text-muted small mb-0">Kelola data penyewa dan status aktif</p>
     </div>
     <div>
-        <!-- Tombol Tambah (Arahkan ke form add kustom nanti) -->
+        <!-- Tombol Tambah -->
         <a href="{% url 'tenant_add' %}" class="btn btn-ink shadow-sm">
             <i class="fas fa-plus me-2"></i>Tambah Penghuni Baru
         </a>
@@ -22,16 +22,16 @@
 <div class="card-paper overflow-hidden">
     <!-- Filter Sederhana -->
     <div class="card-header-clean bg-light d-flex justify-content-between align-items-center py-3">
-        <!-- FORM PENCARIAN (Perbaikan Layout Input Group) -->
+        <!-- FORM PENCARIAN -->
         <form method="get" action="" class="d-flex" style="max-width: 300px; width: 100%;">
             <div class="input-group">
                 <span class="input-group-text bg-white border-end-0 text-muted">
                     <i class="fas fa-search"></i>
                 </span>
-                <input type="text" name="q" class="form-control border-start-0 ps-2 shadow-none" 
-                    placeholder="Cari nama penghuni..." value="{{ search_query|default:'' }}" 
-                    style="border-left: none;"> <!-- Style inline untuk paksa border hilang -->
-                <button type="submit" class="btn btn-primary">Cari</button> <!-- Tombol submit -->
+                <input type="text" name="q" class="form-control border-start-0 shadow-none" 
+                       placeholder="Cari nama penghuni..." value="{{ search_query|default:'' }}" 
+                       style="border-left: none;">
+                <button type="submit" class="btn btn-primary">Cari</button>
             </div>
         </form>
         
@@ -58,6 +58,7 @@
                 <tr style="border-bottom: 1px solid var(--color-border);">
                     <td class="ps-4 py-3">
                         <div class="d-flex align-items-center">
+                            <!-- Inisial Nama (Avatar) -->
                             <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white me-3" style="width: 40px; height: 40px; font-weight: bold;">
                                 {{ tenant.full_name|slice:":2"|upper }}
                             </div>
@@ -100,10 +101,37 @@
                         <span class="badge-pill badge-success">Aktif</span>
                     </td>
                     <td class="pe-4 text-end">
-                        <!-- Tombol Edit (Placeholder URL kustom, nanti kita buat view-nya) -->
-                        <a href="{% url 'tenant_edit' tenant.pk %}" class="btn btn-sm btn-ink-outline me-1" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </a>
+                        <div class="d-flex justify-content-end gap-2">
+                            
+                            <!-- LOGIKA TOMBOL -->
+                            {% with contract=tenant.contracts.last %}
+                                
+                                {% if contract and contract.is_active %}
+                                    <!-- JIKA SUDAH PUNYA KAMAR: Tampilkan Edit & Checkout -->
+                                    <a href="{% url 'tenant_edit' tenant.pk %}" class="btn btn-sm btn-ink-outline" title="Edit Data">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'tenant_checkout' tenant.pk %}" 
+                                    class="btn btn-sm btn-outline-danger" 
+                                    title="Check Out / Selesai Sewa"
+                                    onclick="return confirm('Yakin check out?')">
+                                        <i class="fas fa-sign-out-alt"></i>
+                                    </a>
+                                
+                                {% else %}
+                                    <!-- JIKA BELUM PUNYA KAMAR: Tampilkan Assign -->
+                                    <a href="{% url 'tenant_assign_room' tenant.pk %}" class="btn btn-sm btn-primary shadow-sm" title="Assign Kamar">
+                                        <i class="fas fa-key me-1"></i> Pilih Kamar
+                                    </a>
+                                    
+                                    <!-- Tetap bisa edit data diri -->
+                                    <a href="{% url 'tenant_edit' tenant.pk %}" class="btn btn-sm btn-ink-outline" title="Edit Data">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                {% endif %}
+
+                            {% endwith %}
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
@@ -121,7 +149,6 @@
         </table>
     </div>
     
-    <!-- Pagination (Pemanis UI - Statis Dulu) -->
     <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
         <small class="text-muted">Menampilkan semua data</small>
     </div>

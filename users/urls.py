@@ -1,0 +1,7 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('staff/', views.staff_list, name='staff_list'),
+    path('staff/add/', views.staff_create, name='staff_add'),
+]

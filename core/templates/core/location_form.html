@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Pengaturan{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Edit Lokasi</h2>
+                <p class="text-muted small mb-0">Ubah informasi dan tarif kost</p>
+            </div>
+            {% if user.is_superuser %}
+                <a href="{% url 'location_list' %}" class="btn btn-sm btn-ink-outline">Kembali</a>
+            {% else %}
+                <a href="{% url 'dashboard' %}" class="btn btn-sm btn-ink-outline">Kembali</a>
+            {% endif %}
+        </div>
+
+        <div class="card-paper">
+            <div class="card-body-clean">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% if form.errors %}
+                        <div class="alert alert-danger small rounded-3 mb-4">Mohon perbaiki isian data.</div>
+                    {% endif %}
+
+                    <!-- Nama Kost -->
+                    <div class="mb-3">
+                        <label class="form-label-clean">{{ form.name.label }}</label>
+                        {{ form.name }}
+                    </div>
+
+                    <!-- Alamat -->
+                    <div class="mb-3">
+                        <label class="form-label-clean">{{ form.address.label }}</label>
+                        {{ form.address }}
+                    </div>
+
+                    <!-- Tarif Listrik (Highlight) -->
+                    <div class="mb-4 p-3 bg-warning bg-opacity-10 rounded-3 border border-warning border-opacity-25">
+                        <label class="form-label-clean text-dark mb-2"><i class="fas fa-bolt text-warning me-2"></i>{{ form.electricity_rate_per_kwh.label }}</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">Rp</span>
+                            {{ form.electricity_rate_per_kwh }}
+                        </div>
+                        <div class="form-text small mt-1">Perubahan tarif akan berlaku untuk tagihan yang dibuat <strong>setelah</strong> ini. Tagihan lama tidak berubah.</div>
+                    </div>
+
+                    <!-- Deskripsi -->
+                    <div class="mb-4">
+                        <label class="form-label-clean">{{ form.description.label }}</label>
+                        {{ form.description }}
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-ink py-3 shadow-sm">
+                            <i class="fas fa-save me-2"></i> Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

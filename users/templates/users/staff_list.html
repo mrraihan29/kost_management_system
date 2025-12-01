@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Kelola Staff{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Kelola Staff</h2>
+        <p class="text-muted small mb-0">Manajemen akun admin penjaga kost</p>
+    </div>
+    <a href="{% url 'staff_add' %}" class="btn btn-ink shadow-sm">
+        <i class="fas fa-user-plus me-2"></i>Tambah Admin Baru
+    </a>
+</div>
+
+<div class="card-paper overflow-hidden">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0 table-hover">
+            <thead style="background-color: var(--color-primary-light);">
+                <tr>
+                    <th class="ps-4 py-3 small fw-bold text-uppercase" style="color: var(--color-primary);">Username</th>
+                    <th class="py-3 small fw-bold text-uppercase" style="color: var(--color-primary);">Nama Lengkap</th>
+                    <th class="py-3 small fw-bold text-uppercase" style="color: var(--color-primary);">Lokasi Tugas</th>
+                    <th class="py-3 small fw-bold text-uppercase" style="color: var(--color-primary);">Status</th>
+                    <th class="pe-4 py-3 small fw-bold text-uppercase text-end" style="color: var(--color-primary);">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for staff in staffs %}
+                <tr style="border-bottom: 1px solid var(--color-border);">
+                    <td class="ps-4 fw-bold">{{ staff.username }}</td>
+                    <td>{{ staff.first_name }} {{ staff.last_name }}</td>
+                    <td>
+                        {% if staff.admin_profile.assigned_location %}
+                            <span class="badge bg-light text-dark border border-secondary">
+                                <i class="fas fa-map-marker-alt me-1 text-danger"></i>
+                                {{ staff.admin_profile.assigned_location.name }}
+                            </span>
+                        {% else %}
+                            <span class="text-danger small">Belum Ditugaskan</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if staff.is_active %}
+                            <span class="badge-pill badge-success">Aktif</span>
+                        {% else %}
+                            <span class="badge-pill badge-danger">Non-Aktif</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4 text-end">
+                        <button class="btn btn-sm btn-ink-outline" disabled title="Edit (Coming Soon)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">Belum ada staff admin.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

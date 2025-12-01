@@ -12,11 +12,39 @@
     </div>
 </div>
 
-<!-- Filter Tab Sederhana -->
-<div class="mb-4">
-    <a href="{% url 'ticket_list' %}" class="btn btn-sm {% if not current_status %}btn-ink{% else %}btn-ink-outline{% endif %} me-2">Semua</a>
-    <a href="?status=PENDING" class="btn btn-sm {% if current_status == 'PENDING' %}btn-ink{% else %}btn-ink-outline{% endif %} me-2">Menunggu</a>
-    <a href="?status=PROSES" class="btn btn-sm {% if current_status == 'PROSES' %}btn-ink{% else %}btn-ink-outline{% endif %} me-2">Proses</a>
+<!-- Filter Tab -->
+<div class="card-paper mb-4 bg-light">
+    <div class="card-body-clean py-3">
+        <form method="get" class="row g-3 align-items-center">
+            
+            <!-- Filter Status (Tombol) -->
+            <div class="col-auto">
+                <div class="btn-group" role="group">
+                    <a href="?status=&room={{ current_room|default:'' }}" class="btn btn-sm {% if not current_status %}btn-ink{% else %}btn-ink-outline{% endif %}">Semua</a>
+                    <a href="?status=PENDING&room={{ current_room|default:'' }}" class="btn btn-sm {% if current_status == 'PENDING' %}btn-ink{% else %}btn-ink-outline{% endif %}">Menunggu</a>
+                    <a href="?status=PROSES&room={{ current_room|default:'' }}" class="btn btn-sm {% if current_status == 'PROSES' %}btn-ink{% else %}btn-ink-outline{% endif %}">Proses</a>
+                </div>
+            </div>
+
+            <!-- Filter Kamar (Dropdown) - FITUR BARU -->
+            <div class="col-auto ms-auto">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-door-closed"></i></span>
+                    <select name="room" class="form-select border-start-0 shadow-none" onchange="this.form.submit()" style="min-width: 150px;">
+                        <option value="">-- Semua Kamar --</option>
+                        {% for r in rooms %}
+                            <option value="{{ r.id }}" {% if current_room == r.id %}selected{% endif %}>
+                                {{ r.room_number }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <!-- Input hidden agar status tidak hilang saat ganti kamar -->
+                    <input type="hidden" name="status" value="{{ current_status|default:'' }}">
+                </div>
+            </div>
+
+        </form>
+    </div>
 </div>
 
 <!-- Tabel -->

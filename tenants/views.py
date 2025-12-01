@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q  # Import Q untuk pencarian kompleks
+from django.db.models import Q
 from django.contrib import messages
 from .models import Tenant
 
@@ -8,6 +8,9 @@ from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView, UpdateView
 from django.contrib.messages.views import SuccessMessageMixin
 from .forms import TenantForm
+from django.utils import timezone
+from .models import TenantContract
+from .forms import TenantContractForm, TenantForm
 
 @login_required(login_url='/accounts/login/')
 def tenant_list(request):
@@ -76,4 +79,52 @@ class TenantUpdateView(SuccessMessageMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Edit Penghuni'
         context['btn_text'] = 'Update Data'
+        return context
+    
+@login_required(login_url='/accounts/login/')
+def tenant_checkout(request, pk):
+    """
+    Aksi Check-Out: Menonaktifkan kontrak sewa penghuni
+    """
+    tenant = get_object_or_404(Tenant, pk=pk)
+    
+    # Cari kontrak yang masih aktif
+    active_contract = tenant.contracts.filter(is_active=True).first()
+    
+    if active_contract:
+        # 1. Nonaktifkan Kontrak
+        active_contract.is_active = False
+        # 2. Catat tanggal keluar (Hari ini)
+        active_contract.end_date = timezone.now().date()
+        active_contract.save()
+        
+        messages.success(request, f"Penghuni {tenant.full_name} berhasil di-Check Out. Kamar sekarang kosong.")
+    else:
+        messages.warning(request, "Penghuni ini tidak memiliki kontrak aktif.")
+        
+    return redirect('tenant_list')
+
+class TenantContractCreateView(SuccessMessageMixin, CreateView):
+    model = TenantContract
+    form_class = TenantContractForm
+    template_name = 'tenants/assign_room.html'
+    success_url = reverse_lazy('tenant_list')
+    success_message = "Berhasil assign kamar ke penghuni!"
+
+    def get_form_kwargs(self):
+        """Kirim user ke form agar bisa filter lokasi"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        # Otomatis isi tenant berdasarkan URL (pk)
+        tenant_id = self.kwargs['pk']
+        form.instance.tenant = get_object_or_404(Tenant, pk=tenant_id)
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tenant = get_object_or_404(Tenant, pk=self.kwargs['pk'])
+        context['tenant'] = tenant
         return context
