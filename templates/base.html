@@ -6,21 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Evy Kost - {% block title %}Management{% endblock %}</title>
     
-    <!-- Bootstrap 5 CDN (Hanya untuk Grid System & Utility, BUKAN untuk styling utama) -->
+    <!-- Bootstrap 5 CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome (Ikon) -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- CUSTOM CSS (Design System Kita) -->
+    <!-- CUSTOM CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body class="{% if hide_sidebar %}bg-light-gray{% endif %}">
+<body>
 
     <div class="d-flex" id="wrapper">
-        <!-- SIDEBAR (Hanya tampil jika user login) -->
+        <!-- SIDEBAR -->
         {% if user.is_authenticated and not hide_sidebar %}
-        <div class="sidebar-clean d-flex flex-column" id="sidebar-wrapper" style="width: 260px; flex-shrink: 0;">
+        <div class="sidebar-clean d-flex flex-column" id="sidebar-wrapper">
             
-            <!-- Brand Logo / Nama -->
+            <!-- TOMBOL CLOSE (Hanya Muncul di HP) -->
+            <div class="d-md-none text-end p-2">
+                <button class="btn btn-sm btn-link text-danger text-decoration-none" id="sidebar-close">
+                    <i class="fas fa-times fa-lg"></i> Tutup
+                </button>
+            </div>
+
+            <!-- Brand Logo -->
             <div class="sidebar-brand">
                 {% if user.admin_profile.assigned_location %}
                     <div style="font-family: 'Inter'; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #6B7280;">
@@ -37,21 +44,33 @@
                 <a href="{% url 'dashboard' %}" class="nav-link-clean {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
                     <i class="fas fa-home nav-icon"></i> Dashboard
                 </a>
-                <a href="{% url 'tenant_list' %}" class="nav-link-clean">
+                <a href="{% url 'tenant_list' %}" class="nav-link-clean {% if 'tenant' in request.path %}active{% endif %}">
                     <i class="fas fa-users nav-icon"></i> Penghuni
                 </a>
-                <a href="{% url 'invoice_list' %}" class="nav-link-clean">
+                <a href="{% url 'invoice_list' %}" class="nav-link-clean {% if 'invoice' in request.path %}active{% endif %}">
                     <i class="fas fa-file-invoice nav-icon"></i> Tagihan
                 </a>
                 <a href="{% url 'operation_list' %}" class="nav-link-clean {% if 'operation' in request.path %}active{% endif %}">
                     <i class="fas fa-tools nav-icon"></i> Operasional
                 </a>
-                <a href="{% url 'finance_report' %}" class="nav-link-clean {% if 'report' in request.path %}active{% endif %}">
-                    <i class="fas fa-chart-pie nav-icon"></i> Laporan
-                </a>
-                <a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
-                    <i class="fas fa-hammer nav-icon"></i> Maintenance
-                </a>
+                
+                <!-- Menu Super Admin -->
+                {% if user.is_superuser %}
+                    <div class="mt-4 mb-2 ps-4 small text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
+                        Super Admin
+                    </div>
+                    <a href="{% url 'staff_list' %}" class="nav-link-clean {% if 'staff' in request.path %}active{% endif %}">
+                        <i class="fas fa-user-tie nav-icon"></i> Kelola Staff
+                    </a>
+                    <a href="{% url 'finance_report' %}" class="nav-link-clean {% if 'report' in request.path %}active{% endif %}">
+                        <i class="fas fa-chart-pie nav-icon"></i> Laporan
+                    </a>
+                {% endif %}
+                
+                <!-- Menu Settings -->
+                <div class="mt-4 mb-2 ps-4 small text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">
+                    Akun
+                </div>
                 <a href="{% url 'location_list' %}" class="nav-link-clean {% if 'settings' in request.path %}active{% endif %}">
                     <i class="fas fa-cog nav-icon"></i> Pengaturan
                 </a>
@@ -60,19 +79,8 @@
                 </a>
             </div>
 
-            {% if user.is_superuser %}
-                <div class="mt-4 mb-2 ps-3 small text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1px;">
-                    Super Admin
-                </div>
-                <a href="{% url 'staff_list' %}" class="nav-link-clean {% if 'staff' in request.path %}active{% endif %}">
-                    <i class="fas fa-user-tie nav-icon"></i> Kelola Staff
-                </a>
-            {% endif %}
-            
-
-            <!-- Tombol Logout (Di Bawah) -->
+            <!-- Tombol Logout -->
             <div class="p-3 border-top">
-                <!-- Menggunakan Form POST untuk Logout Aman Django 5 -->
                 <form action="{% url 'logout' %}" method="post">
                     {% csrf_token %}
                     <button type="submit" class="nav-link-clean text-danger w-100 text-start bg-transparent border-0">
@@ -86,24 +94,26 @@
         <!-- KONTEN UTAMA -->
         <div id="page-content-wrapper" class="w-100 d-flex flex-column" style="height: 100vh; overflow-y: auto;">
             
-            <!-- Navbar Mobile (Hanya muncul di layar HP) -->
-            <nav class="navbar navbar-light bg-white border-bottom d-md-none px-3 py-3">
+            <!-- Navbar Mobile (Tombol Burger) -->
+            <nav class="navbar navbar-light bg-white border-bottom d-md-none px-3 py-3 shadow-sm sticky-top">
                 <span class="brand-font fs-5 text-primary">Evy Kost</span>
-                <button class="btn btn-sm btn-ink-outline" id="menu-toggle"><i class="fas fa-bars"></i></button>
+                <button class="btn btn-sm btn-ink-outline" id="menu-toggle">
+                    <i class="fas fa-bars"></i> Menu
+                </button>
             </nav>
 
-            <div class="container-fluid p-4 p-md-5">
-                <!-- Area Alert / Pesan Error -->
+            <div class="container-fluid p-3 p-md-5">
+                <!-- Alerts -->
                 {% if messages %}
                     {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0 mb-4" role="alert" style="border-radius: 10px; background-color: #fff; border-left: 5px solid var(--color-primary);">
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0 mb-4" role="alert" style="border-radius: 10px; border-left: 5px solid var(--color-primary);">
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     {% endfor %}
                 {% endif %}
 
-                <!-- ISI HALAMAN DINAMIS -->
+                <!-- Isi Halaman -->
                 {% block content %}
                 {% endblock %}
             </div>
@@ -113,12 +123,26 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Script simpel untuk toggle menu di HP
-        document.getElementById("menu-toggle")?.addEventListener("click", function() {
-            document.getElementById("wrapper").classList.toggle("toggled");
-            // Catatan: Fitur toggle mobile butuh sedikit CSS tambahan untuk class .toggled
-            // Tapi untuk sekarang ini cukup agar tombolnya tidak error.
-        });
+        // Logic Toggle Menu Mobile
+        const wrapper = document.getElementById("wrapper");
+        const menuToggle = document.getElementById("menu-toggle");
+        const menuClose = document.getElementById("sidebar-close");
+
+        // Buka Menu
+        if(menuToggle){
+            menuToggle.addEventListener("click", function(e) {
+                e.preventDefault();
+                wrapper.classList.toggle("toggled");
+            });
+        }
+
+        // Tutup Menu (Tombol X)
+        if(menuClose){
+            menuClose.addEventListener("click", function(e) {
+                e.preventDefault();
+                wrapper.classList.remove("toggled");
+            });
+        }
     </script>
 </body>
 </html>

@@ -24,6 +24,7 @@
     --color-warning-bg: #FEF3C7;    /* Amber 100 */
     --color-danger: #DC2626;        /* Red 600 */
     --color-danger-bg: #FEE2E2;     /* Red 100 */
+
 }
 
 /* --- 2. GLOBAL RESET & BASE --- */
@@ -186,4 +187,41 @@ a { text-decoration: none; transition: all 0.2s ease; }
 
 .bg-light-gray {
     background-color: #F3F4F6 !important; /* Abu-abu muda elegan */
+}
+
+#wrapper {
+    overflow-x: hidden; /* Mencegah scroll ke samping saat animasi */
+    position: relative;
+}
+
+/* Aturan Dasar Sidebar */
+#sidebar-wrapper {
+    min-height: 100vh;
+    width: 260px; /* Lebar tetap */
+    transition: all 0.3s ease; /* Animasi halus */
+    z-index: 1050; /* Pastikan di atas konten */
+}
+
+/* KHUSUS LAYAR HP (Lebar < 768px) */
+@media (max-width: 768px) {
+    
+    #sidebar-wrapper {
+        /* Ubah jadi melayang (Overlay) */
+        position: fixed; 
+        top: 0;
+        left: -260px; /* Sembunyi di kiri layar */
+        height: 100%;
+        box-shadow: 5px 0 15px rgba(0,0,0,0.3); /* Bayangan agar terlihat melayang */
+    }
+
+    /* Saat class .toggled aktif (Tombol Menu diklik) */
+    #wrapper.toggled #sidebar-wrapper {
+        left: 0; /* Munculkan sidebar */
+    }
+
+    /* Gelapkan konten belakang saat menu terbuka (Efek Fokus) */
+    #wrapper.toggled #page-content-wrapper {
+        opacity: 0.3; /* Konten jadi transparan */
+        pointer-events: none; /* Konten tidak bisa diklik saat menu buka */
+    }
 }
