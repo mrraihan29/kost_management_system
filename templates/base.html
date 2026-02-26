@@ -53,6 +53,15 @@
                 <a href="{% url 'operation_list' %}" class="nav-link-clean {% if 'operation' in request.path %}active{% endif %}">
                     <i class="fas fa-tools nav-icon"></i> Operasional
                 </a>
+                <a href="{% url 'ticket_list' %}" class="nav-link-clean {% if 'tickets' in request.path %}active{% endif %}">
+                    <i class="fas fa-hammer fa-fw nav-icon"></i> Maintenance
+                </a>
+                <a href="{% url 'room_list' %}" class="nav-link-clean {% if 'rooms' in request.path %}active{% endif %}">
+                    <i class="fas fa-door-open nav-icon"></i> Kelola Kamar
+                </a>
+                <a href="{% url 'finance_report' %}" class="nav-link-clean {% if 'report' in request.path %}active{% endif %}">
+                    <i class="fas fa-chart-pie nav-icon"></i> Laporan
+                </a>
                 
                 <!-- Menu Super Admin -->
                 {% if user.is_superuser %}
@@ -61,9 +70,6 @@
                     </div>
                     <a href="{% url 'staff_list' %}" class="nav-link-clean {% if 'staff' in request.path %}active{% endif %}">
                         <i class="fas fa-user-tie nav-icon"></i> Kelola Staff
-                    </a>
-                    <a href="{% url 'finance_report' %}" class="nav-link-clean {% if 'report' in request.path %}active{% endif %}">
-                        <i class="fas fa-chart-pie nav-icon"></i> Laporan
                     </a>
                 {% endif %}
                 

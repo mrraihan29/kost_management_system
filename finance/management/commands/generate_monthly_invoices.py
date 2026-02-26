@@ -11,22 +11,33 @@ class Command(BaseCommand):
         self.stdout.write("Daftar Kontrak Aktif:")
         
         # Ambil semua kontrak aktif
-        active_contracts = TenantContract.objects.filter(is_active=True)
+        active_contracts = TenantContract.objects.filter(is_active=True).select_related('tenant', 'room')
         created_count = 0
         
         today = timezone.now().date()
-        # Asumsi: Kita generate tagihan untuk periode bulan depan
-        # (Logic sederhana: Tanggal 1 bulan depan)
-        next_month = today + relativedelta(months=1)
-        billing_start = next_month.replace(day=1) 
-        # Jatuh tempo H+10 dari awal periode
-        due_date = billing_start + relativedelta(days=10)
+        billing_start_base = (today + relativedelta(months=1)).replace(day=1)
 
         for contract in active_contracts:
+            location_name = (contract.room.kost_location.name or '').strip().lower()
+            is_ancol = 'ancol' in location_name
+
+            if is_ancol:
+                # ANCOL: siklus per-tenant berdasarkan tanggal kontrak
+                try:
+                    billing_start = billing_start_base.replace(day=contract.start_date.day)
+                except ValueError:
+                    billing_start = billing_start_base.replace(day=28)
+                due_date = billing_start
+            else:
+                # NON-ANCOL: serentak mengikuti tanggal global sistem
+                billing_start = billing_start_base
+                due_date = billing_start + relativedelta(days=10)
+
             # Cek apakah sudah ada tagihan untuk bulan tersebut agar tidak duplikat
             exists = Invoice.objects.filter(
                 contract=contract,
-                billing_period_start=billing_start
+                billing_period_start__month=billing_start.month,
+                billing_period_start__year=billing_start.year
             ).exists()
             
             if not exists:
@@ -36,10 +47,10 @@ class Command(BaseCommand):
                     due_date=due_date,
                     base_rent_amount=contract.monthly_rent_amount,
                     electricity_bill_amount=0,
-                    total_amount=contract.monthly_rent_amount, # Awalnya sama dengan sewa
+                    total_amount=contract.monthly_rent_amount,
                     status='BELUM_LUNAS'
                 )
-                self.stdout.write(f" + Tagihan dibuat untuk: {contract.tenant.full_name}")
+                self.stdout.write(f" + Tagihan dibuat untuk: {contract.tenant.full_name} (tgl {billing_start})")
                 created_count += 1
             else:
                 self.stdout.write(f" . Skip (Sudah ada): {contract.tenant.full_name}")

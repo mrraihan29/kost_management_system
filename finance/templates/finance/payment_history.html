@@ -51,6 +51,13 @@
                                         <span class="badge-pill badge-warning">Diproses</span>
                                     {% elif inv.status == 'TELAT_BAYAR' %}
                                         <span class="badge-pill badge-danger">Telat</span>
+                                        {% with last_payment=inv.payments.last %}
+                                            {% if last_payment and last_payment.rejection_note %}
+                                                <div class="text-danger small mt-1">
+                                                    <i class="fas fa-info-circle me-1"></i>{{ last_payment.rejection_note }}
+                                                </div>
+                                            {% endif %}
+                                        {% endwith %}
                                     {% else %}
                                         <span class="badge bg-light text-dark border">Belum</span>
                                     {% endif %}

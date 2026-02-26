@@ -25,9 +25,13 @@ COPY . /app/
 # 7. Kumpulkan file static (CSS/JS) ke satu folder
 RUN python manage.py collectstatic --noinput
 
-# 8. Healthcheck bawaan Docker (Coolify otomatis baca)
+# 8. Jalankan migrasi database saat container start (via entrypoint)
+# K-05 fix: migrate ditaruh di CMD agar jalan saat runtime (bukan build time)
+# karena database belum tersedia saat docker build
+
+# 9. Healthcheck bawaan Docker (Coolify otomatis baca)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/health/ || exit 1
 
-# 9. Jalankan Gunicorn
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+# 10. Jalankan migrasi lalu Gunicorn (K-05 fix)
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]

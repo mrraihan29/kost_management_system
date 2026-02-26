@@ -1,27 +1,21 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from core.models import Room
-from tenants.models import TenantContract
+from core.models import Room, KostLocation
+from tenants.models import TenantContract, MaintenanceTicket
 from .models import Invoice, Payment, ElectricityReading, OperationCost
-from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, OperationCostForm
+from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, OperationCostForm, MaintenanceForm, ReportFilterForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
-from django.db.models import Q, Sum
-from django.http import HttpResponseForbidden
-from .forms import MaintenanceForm
-from tenants.models import MaintenanceTicket
-import csv
-import datetime
-from django.http import HttpResponse
-from django.db.models import Sum, Count
+from django.db.models import Q, Sum, Count
 from django.db.models.functions import TruncMonth
-import openpyxl # Library Excel
+from django.http import HttpResponse, HttpResponseForbidden
+from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
+from dateutil.relativedelta import relativedelta
+import datetime
+import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from .forms import ReportFilterForm # Import form baru
-from dateutil.relativedelta import relativedelta # Pastikan ini ada
-from django.utils import timezone
-from tenants.models import TenantContract
 
 def public_payment_step1(request):
     """
@@ -53,6 +47,7 @@ def public_payment_step1(request):
             # --- JIKA SUKSES ---
             # Simpan ID kontrak di Session (Saku Browser)
             request.session['verified_contract_id'] = contract.id
+            request.session.set_expiry(1800)  # B-FLOW-05 fix: Session expires in 30 minutes
             messages.success(request, f"Halo, {contract.tenant.full_name}! Silakan upload bukti bayar.")
             return redirect('public_payment_step2')
     
@@ -72,13 +67,10 @@ def public_payment_step2(request):
         messages.error(request, "Sesi habis. Silakan masukkan PIN ulang.")
         return redirect('public_payment_step1')
 
-    contract = get_object_or_404(TenantContract, id=contract_id)
-
-    # Cari tagihan AKTIF (Belum Lunas / Telat Bayar)
-    # Kita ambil tagihan terbaru yang belum lunas
+    contract = get_object_or_404(TenantContract, id=contract_id, is_active=True)
     active_invoice = Invoice.objects.filter(
         contract=contract
-    ).exclude(status='LUNAS').order_by('-billing_period_start').first()
+    ).exclude(status__in=['LUNAS', 'MENUNGGU_VERIFIKASI']).order_by('-billing_period_start').first()
 
     if request.method == 'POST':
         form = PaymentUploadForm(request.POST, request.FILES)
@@ -129,20 +121,51 @@ def public_payment_history(request):
     # Ambil SEMUA invoice, urutkan dari yang terbaru
     invoices = Invoice.objects.filter(contract=contract).order_by('-billing_period_start')
 
+    # E-05 fix: Pagination untuk riwayat pembayaran
+    paginator = Paginator(invoices, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
         'contract': contract,
-        'invoices': invoices,
+        'invoices': page_obj,
+        'page_obj': page_obj,
         'hide_sidebar': True # Pastikan sidebar admin tidak muncul
     }
     return render(request, 'finance/payment_history.html', context)
 
-@login_required(login_url='/admin/login/')
+def public_logout(request):
+    """
+    Logout Portal Publik — Hapus session penghuni (B-FLOW-04)
+    """
+    if 'verified_contract_id' in request.session:
+        del request.session['verified_contract_id']
+    messages.info(request, "Anda telah keluar. Silakan masukkan PIN untuk masuk kembali.")
+    return redirect('public_payment_step1')
+
+@require_POST
+@login_required(login_url='/accounts/login/')
 def verify_payment(request, payment_id, action):
     """
     Logika Verifikasi (Approve/Reject) FR-03
     """
     payment = get_object_or_404(Payment, id=payment_id)
     invoice = payment.invoice
+
+    # Security: Cek kepemilikan lokasi (F-01 fix)
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses untuk memverifikasi pembayaran ini.")
+                return redirect('dashboard')
+        else:
+            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
+            return redirect('dashboard')
+
+    # F-03 fix: Validasi action
+    if action not in ('approve', 'reject'):
+        messages.error(request, "Aksi tidak valid.")
+        return redirect('dashboard')
 
     if action == 'approve':
         # Update Invoice jadi LUNAS
@@ -157,14 +180,19 @@ def verify_payment(request, payment_id, action):
         messages.success(request, f"Pembayaran {invoice.contract.tenant.full_name} disetujui.")
 
     elif action == 'reject':
-        # Kembalikan status Invoice ke TELAT_BAYAR (agar ditagih ulang)
-        invoice.status = 'TELAT_BAYAR'
+        # F-02 fix: Kembalikan status berdasarkan apakah sudah lewat jatuh tempo
+        today = timezone.now().date()
+        if invoice.due_date < today:
+            invoice.status = 'TELAT_BAYAR'
+        else:
+            invoice.status = 'BELUM_LUNAS'
         invoice.save()
         
-        # Update Payment Info
+        # Update Payment Info (B-FLOW-03 fix: Custom rejection note)
         payment.verified_by = request.user
         payment.verified_at = timezone.now()
-        payment.rejection_note = "Bukti tidak valid (Ditolak Admin)"
+        custom_note = request.POST.get('rejection_note', '').strip()
+        payment.rejection_note = custom_note if custom_note else "Bukti tidak valid (Ditolak Admin)"
         payment.save()
         
         messages.error(request, f"Pembayaran {invoice.contract.tenant.full_name} DITOLAK.")
@@ -179,8 +207,10 @@ def invoice_list(request):
     status_filter = request.GET.get('status')
     search_query = request.GET.get('q')
 
-    # 1. Base Query
-    invoices = Invoice.objects.all().order_by('-due_date')
+    # 1. Base Query (C-PERF-03 fix: select_related untuk menghindari N+1)
+    invoices = Invoice.objects.select_related(
+        'contract__tenant', 'contract__room__kost_location'
+    ).prefetch_related('payments').order_by('-due_date')
 
     # 2. SECURITY FILTER (BUG FIX)
     # Admin biasa HANYA boleh melihat tagihan di lokasinya
@@ -203,8 +233,14 @@ def invoice_list(request):
             Q(contract__room__room_number__icontains=search_query)
         )
 
+    # C-PAGE-02: Pagination
+    paginator = Paginator(invoices, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'invoices': invoices,
+        'invoices': page_obj,
+        'page_obj': page_obj,
         'search_query': search_query,
         'current_status': status_filter
     }
@@ -217,6 +253,16 @@ def invoice_detail(request, pk):
     """
     invoice = get_object_or_404(Invoice, pk=pk)
     
+    # Security: Cek kepemilikan lokasi (A-SEC-04)
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke tagihan ini.")
+                return redirect('invoice_list')
+        else:
+            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
+            return redirect('dashboard')
+
     # Cek apakah sudah ada catatan listrik?
     electricity = ElectricityReading.objects.filter(invoice=invoice).first()
 
@@ -254,7 +300,9 @@ def operation_list(request):
     """
     Halaman Daftar Biaya Operasional
     """
-    costs = OperationCost.objects.all().order_by('-incurred_date')
+    costs = OperationCost.objects.select_related(
+        'kost_location', 'admin'
+    ).order_by('-incurred_date')
 
     # Filter Lokasi (Security: Admin Ancol cuma lihat Ancol)
     if not request.user.is_superuser:
@@ -263,11 +311,21 @@ def operation_list(request):
         else:
             costs = costs.none()
 
-    # Hitung Total Pengeluaran (Bulan Ini) - Opsional, buat total semua dulu
-    total_expenses = costs.aggregate(Sum('amount'))['amount__sum'] or 0
+    # G-02 fix: Total pengeluaran bulan ini saja (bukan semua waktu)
+    today = timezone.now().date()
+    total_expenses = costs.filter(
+        incurred_date__year=today.year,
+        incurred_date__month=today.month
+    ).aggregate(Sum('amount'))['amount__sum'] or 0
+
+    # C-PAGE-03: Pagination
+    paginator = Paginator(costs, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
     context = {
-        'costs': costs,
+        'costs': page_obj,
+        'page_obj': page_obj,
         'total_expenses': total_expenses
     }
     return render(request, 'finance/operation_list.html', context)
@@ -292,12 +350,64 @@ def operation_create(request):
             return redirect('operation_list')
     else:
         form = OperationCostForm()
-        # Jika admin biasa, sembunyikan pilihan lokasi (auto-select)
-        if not request.user.is_superuser and hasattr(request.user, 'admin_profile'):
-            # (Opsional: logic untuk hide field lokasi bisa di form, tapi biarkan dulu agar simpel)
-            pass
+        # G-01 fix: Filter dropdown lokasi untuk admin biasa
+        if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            form.fields['kost_location'].queryset = KostLocation.objects.filter(pk=request.user.admin_profile.assigned_location.pk)
+            form.fields['kost_location'].initial = request.user.admin_profile.assigned_location
 
     return render(request, 'finance/operation_form.html', {'form': form, 'title': 'Catat Pengeluaran'})
+
+@login_required(login_url='/accounts/login/')
+def operation_update(request, pk):
+    """
+    Form Edit Biaya Operasional (B-CRUD-02)
+    """
+    cost = get_object_or_404(OperationCost, pk=pk)
+    
+    # Security: Cek kepemilikan lokasi
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if cost.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke data ini.")
+                return redirect('operation_list')
+        else:
+            return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = OperationCostForm(request.POST, request.FILES, instance=cost)
+        if form.is_valid():
+            updated_cost = form.save(commit=False)
+            # Security: Jika bukan superuser, paksa lokasi sesuai admin
+            if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+                updated_cost.kost_location = request.user.admin_profile.assigned_location
+            updated_cost.save()
+            messages.success(request, "Data pengeluaran berhasil diperbarui.")
+            return redirect('operation_list')
+    else:
+        form = OperationCostForm(instance=cost)
+
+    return render(request, 'finance/operation_form.html', {'form': form, 'title': 'Edit Pengeluaran'})
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+def operation_delete(request, pk):
+    """
+    Hapus Biaya Operasional (B-CRUD-02)
+    """
+    cost = get_object_or_404(OperationCost, pk=pk)
+    
+    # Security: Cek kepemilikan lokasi
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if cost.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke data ini.")
+                return redirect('operation_list')
+        else:
+            return redirect('dashboard')
+    
+    cost.delete()
+    messages.success(request, "Data pengeluaran berhasil dihapus.")
+    return redirect('operation_list')
 
 @login_required(login_url='/accounts/login/')
 def print_receipt(request, pk):
@@ -306,6 +416,15 @@ def print_receipt(request, pk):
     """
     invoice = get_object_or_404(Invoice, pk=pk)
     
+    # Security: Cek kepemilikan lokasi (A-SEC-05)
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke kwitansi ini.")
+                return redirect('invoice_list')
+        else:
+            return redirect('dashboard')
+
     # Security: Hanya boleh cetak jika sudah LUNAS
     if invoice.status != 'LUNAS':
         messages.error(request, "Hanya tagihan LUNAS yang bisa dicetak kwitansinya.")
@@ -359,8 +478,14 @@ def public_report_list(request):
     contract = get_object_or_404(TenantContract, id=contract_id)
     tickets = MaintenanceTicket.objects.filter(contract=contract).order_by('-created_at')
 
+    # H-03 fix: Pagination untuk riwayat laporan
+    paginator = Paginator(tickets, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     return render(request, 'finance/report_list.html', {
-        'tickets': tickets, 
+        'tickets': page_obj,
+        'page_obj': page_obj,
         'contract': contract,
         'hide_sidebar': True
     })
@@ -370,8 +495,10 @@ def admin_ticket_list(request):
     """
     Daftar Laporan Kerusakan (Dengan Filter Status & Kamar)
     """
-    # 1. Base Query
-    tickets = MaintenanceTicket.objects.all().order_by('-created_at')
+    # 1. Base Query (C-PERF-05 fix: select_related)
+    tickets = MaintenanceTicket.objects.select_related(
+        'contract__tenant', 'contract__room__kost_location'
+    ).order_by('-created_at')
     
     # 2. Ambil Daftar Kamar untuk Dropdown Filter
     # (Hanya tampilkan kamar yang ada di lokasi admin tersebut)
@@ -397,8 +524,14 @@ def admin_ticket_list(request):
     if room_filter:
         tickets = tickets.filter(contract__room_id=room_filter)
 
+    # C-PAGE-04: Pagination
+    paginator = Paginator(tickets, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'tickets': tickets,
+        'tickets': page_obj,
+        'page_obj': page_obj,
         'rooms': rooms,
         'current_status': status_filter,
         'current_room': int(room_filter) if room_filter else None
@@ -412,9 +545,20 @@ def admin_ticket_update(request, pk):
     """
     ticket = get_object_or_404(MaintenanceTicket, pk=pk)
 
+    # Security: Cek kepemilikan lokasi (A-SEC-06)
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if ticket.contract.room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke tiket ini.")
+                return redirect('ticket_list')
+        else:
+            return redirect('dashboard')
+
     if request.method == 'POST':
         new_status = request.POST.get('status')
-        if new_status:
+        # H-01 fix: Validasi status terhadap STATUS_CHOICES
+        valid_statuses = dict(MaintenanceTicket.STATUS_CHOICES)
+        if new_status and new_status in valid_statuses:
             ticket.status = new_status
             
             # LOGIKA BARU: Jika Selesai, catat waktunya
@@ -426,6 +570,9 @@ def admin_ticket_update(request, pk):
                 
             ticket.save()
             messages.success(request, f"Status laporan '{ticket.title}' diperbarui.")
+            return redirect('ticket_list')
+        elif new_status:
+            messages.error(request, "Status yang dipilih tidak valid.")
             return redirect('ticket_list')
 
     return render(request, 'finance/ticket_detail.html', {'ticket': ticket})
@@ -528,8 +675,15 @@ def export_finance_excel(request):
     year = int(request.GET.get('year', datetime.datetime.now().year))
     loc_id = request.GET.get('kost_location')
     
-    invoices = Invoice.objects.filter(billing_period_start__year=year, status='LUNAS')
-    costs = OperationCost.objects.filter(incurred_date__year=year)
+    # C-PERF-02 fix: select_related untuk Excel export
+    invoices = Invoice.objects.filter(
+        billing_period_start__year=year, status='LUNAS'
+    ).select_related(
+        'contract__tenant', 'contract__room'
+    ).prefetch_related('payments__verified_by')
+    costs = OperationCost.objects.filter(
+        incurred_date__year=year
+    ).select_related('kost_location', 'admin')
     
     if not request.user.is_superuser:
         if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
@@ -612,20 +766,37 @@ def generate_invoices_bulk(request):
         
         # 2. Ambil semua kontrak aktif
         active_contracts = TenantContract.objects.filter(is_active=True)
+        
+        # A-DATA-04 fix: Filter berdasarkan lokasi admin
+        if not request.user.is_superuser:
+            if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+                active_contracts = active_contracts.filter(
+                    room__kost_location=request.user.admin_profile.assigned_location
+                )
+            else:
+                active_contracts = active_contracts.none()
+        
         created_count = 0
         skipped_count = 0
 
         for contract in active_contracts:
-            # Sesuaikan tanggal mulai tagihan dengan tanggal masuk penghuni
-            # Contoh: Masuk tgl 15, maka periode mulai tgl 15 bulan depan
-            try:
-                billing_start = billing_start_base.replace(day=contract.start_date.day)
-            except ValueError:
-                # Fallback untuk tanggal 31 di bulan Februari, dll.
-                billing_start = billing_start_base.replace(day=28)
-            
-            # Jatuh tempo H+10
-            due_date = billing_start + relativedelta(days=10)
+            location_name = (contract.room.kost_location.name or '').strip().lower()
+            is_ancol = 'ancol' in location_name
+
+            if is_ancol:
+                # ANCOL: siklus per-tenant berdasarkan tanggal mulai kontrak
+                # Contoh: mulai tgl 10, maka jatuh tempo tetap tgl 10 setiap bulan
+                try:
+                    billing_start = billing_start_base.replace(day=contract.start_date.day)
+                except ValueError:
+                    # Fallback untuk tanggal 29/30/31 di bulan pendek
+                    billing_start = billing_start_base.replace(day=28)
+                due_date = billing_start
+            else:
+                # NON-ANCOL: serentak mengikuti tanggal global sistem (start bulan)
+                billing_start = billing_start_base
+                # Ketentuan existing: jatuh tempo H+10 dari tanggal muncul tagihan
+                due_date = billing_start + relativedelta(days=10)
 
             # Cek apakah sudah ada tagihan di periode tersebut?
             exists = Invoice.objects.filter(

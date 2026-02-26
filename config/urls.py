@@ -19,12 +19,26 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
+from django.http import JsonResponse
 from core.views import home
+
+
+# D-CFG-06: Health check endpoint (K-06 fix: cek koneksi DB)
+def health_check(request):
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return JsonResponse({'status': 'ok', 'database': 'connected'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'database': str(e)}, status=503)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('health/', health_check, name='health_check'),
     path('', home, name='home'),
-        path('accounts/login/', auth_views.LoginView.as_view(
+    path('accounts/login/', auth_views.LoginView.as_view(
         template_name='auth/login.html',
         extra_context={'hide_sidebar': True} 
     ), name='login'),
@@ -39,6 +53,5 @@ urlpatterns = [
 
 ]   
 
-# Tambahkan baris ini untuk melayani file media saat development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# D-CFG-07: Serve media files (produksi idealnya via nginx/S3)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

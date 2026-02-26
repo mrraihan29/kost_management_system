@@ -98,7 +98,13 @@
                         {% endwith %}
                     </td>
                     <td>
-                        <span class="badge-pill badge-success">Aktif</span>
+                        {% with contract=tenant.contracts.last %}
+                            {% if contract and contract.is_active %}
+                                <span class="badge-pill badge-success">Aktif</span>
+                            {% else %}
+                                <span class="badge bg-secondary text-white" style="border-radius: 20px; padding: 5px 12px; font-size: 0.75rem;">Non-Aktif</span>
+                            {% endif %}
+                        {% endwith %}
                     </td>
                     <td class="pe-4 text-end">
                         <div class="d-flex justify-content-end gap-2">
@@ -128,6 +134,15 @@
                                     <a href="{% url 'tenant_edit' tenant.pk %}" class="btn btn-sm btn-ink-outline" title="Edit Data">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    
+                                    <!-- Hapus data penghuni (B-CRUD-01) -->
+                                    <form method="post" action="{% url 'tenant_delete' tenant.pk %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus Data"
+                                            onclick="return confirm('Yakin hapus data {{ tenant.full_name }}? Semua riwayat kontrak dan tagihan akan ikut terhapus.')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
                                 {% endif %}
 
                             {% endwith %}
@@ -149,8 +164,28 @@
         </table>
     </div>
     
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
     <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
-        <small class="text-muted">Menampilkan semua data</small>
+        <small class="text-muted">Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} data)</small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page=1{% if search_query %}&q={{ search_query }}{% endif %}">&laquo;</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_obj.previous_page_number }}</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_obj.next_page_number }}</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&q={{ search_query }}{% endif %}">&raquo;</a></li>
+                {% endif %}
+            </ul>
+        </nav>
     </div>
+    {% else %}
+    <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
+        <small class="text-muted">Menampilkan semua data ({{ page_obj.paginator.count }} data)</small>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

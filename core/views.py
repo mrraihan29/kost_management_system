@@ -3,9 +3,11 @@ from django.contrib.auth.decorators import login_required
 from finance.models import Invoice, Payment
 from tenants.models import TenantContract
 from core.models import Room, KostLocation
-from django.db.models import Sum
-from .forms import KostLocationForm
+from django.db.models import Sum, Prefetch
+from .forms import KostLocationForm, RoomForm
 from django.contrib import messages
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 # --- VIEW 1: LANDING PAGE (YANG HILANG) ---
 def home(request):
     """
@@ -53,7 +55,7 @@ def admin_dashboard(request):
                 invoices = invoices.filter(contract__room__kost_location=location_obj)
                 rooms = rooms.filter(kost_location=location_obj)
                 location_name = f"Lokasi: {location_obj.name}"
-            except KostLocation.DoesNotExist:
+            except (KostLocation.DoesNotExist, ValueError, TypeError):
                 location_name = "Semua Lokasi (Error ID)"
         else:
             # Default: Lihat Semua
@@ -62,19 +64,33 @@ def admin_dashboard(request):
     # --- HITUNG KPI (Otomatis menyesuaikan filter di atas) ---
     total_pending = invoices.filter(status='MENUNGGU_VERIFIKASI').count()
     total_overdue = invoices.filter(status='TELAT_BAYAR').count()
-    income_this_month = invoices.filter(status='LUNAS').aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    
+    # A-DATA-02 fix: Filter pemasukan bulan ini berdasarkan bulan & tahun saat ini
+    now = timezone.now()
+    income_this_month = invoices.filter(
+        status='LUNAS',
+        billing_period_start__month=now.month,
+        billing_period_start__year=now.year
+    ).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
     # --- DATA PETA VISUAL (FR-10) ---
+    # C-PERF-01 fix: Prefetch untuk menghindari N+1 queries
+    rooms = rooms.select_related('kost_location').prefetch_related(
+        Prefetch('contracts', queryset=TenantContract.objects.filter(is_active=True).select_related('tenant').prefetch_related(
+            Prefetch('invoices', queryset=Invoice.objects.order_by('-due_date'))
+        ))
+    )
+    
     room_visual_data = []
     for room in rooms:
-        active_contract = room.contracts.filter(is_active=True).first()
+        active_contract = room.contracts.all().first()  # Sudah di-prefetch, tidak query lagi
         status_code = 'KOSONG'
         color_class = 'bg-light text-muted border'
         tenant_name = 'Kosong'
         
         if active_contract:
             tenant_name = active_contract.tenant.full_name
-            last_invoice = active_contract.invoices.order_by('-due_date').first()
+            last_invoice = active_contract.invoices.all().first()  # Sudah di-prefetch
             if last_invoice:
                 if last_invoice.status == 'LUNAS':
                     status_code = 'LUNAS'; color_class = 'bg-success text-white'
@@ -97,7 +113,14 @@ def admin_dashboard(request):
     # --- TABEL PERHATIAN ---
     attention_list = invoices.filter(
         status__in=['MENUNGGU_VERIFIKASI', 'TELAT_BAYAR']
+    ).select_related(
+        'contract__tenant', 'contract__room__kost_location'
     ).order_by('status', 'due_date')
+
+    try:
+        selected_loc_int = int(selected_location_id) if selected_location_id else None
+    except (ValueError, TypeError):
+        selected_loc_int = None
 
     context = {
         'location_name': location_name,
@@ -107,7 +130,7 @@ def admin_dashboard(request):
         'attention_list': attention_list,
         'room_visual_data': room_visual_data,
         'all_locations': all_locations, 
-        'selected_location_id': int(selected_location_id) if selected_location_id else None
+        'selected_location_id': selected_loc_int
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -152,3 +175,115 @@ def location_update(request, pk):
         form = KostLocationForm(instance=location)
 
     return render(request, 'core/location_form.html', {'form': form, 'location': location})
+
+
+# --- ROOM MANAGEMENT (B-CRUD-04) ---
+
+@login_required(login_url='/accounts/login/')
+def room_list(request):
+    """
+    Halaman Daftar Kamar (B-CRUD-04)
+    """
+    rooms = Room.objects.all().select_related('kost_location').order_by('kost_location__name', 'room_number')
+    
+    # Filter Lokasi (Security)
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            rooms = rooms.filter(kost_location=request.user.admin_profile.assigned_location)
+        else:
+            rooms = rooms.none()
+    
+    # Tambahkan info okupansi ke setiap room
+    rooms = list(rooms)
+    for room in rooms:
+        room.active_contract = room.contracts.filter(is_active=True).select_related('tenant').first()
+    
+    context = {
+        'rooms': rooms,
+        'total_rooms': len(rooms),
+        'occupied_rooms': sum(1 for r in rooms if r.active_contract),
+    }
+    return render(request, 'core/room_list.html', context)
+
+@login_required(login_url='/accounts/login/')
+def room_create(request):
+    """
+    Form Tambah Kamar (B-CRUD-04)
+    """
+    if request.method == 'POST':
+        form = RoomForm(request.POST)
+        if form.is_valid():
+            room = form.save(commit=False)
+            # Security: Jika bukan superuser, paksa lokasi
+            if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+                room.kost_location = request.user.admin_profile.assigned_location
+            room.save()
+            messages.success(request, f"Kamar {room.room_number} berhasil ditambahkan.")
+            return redirect('room_list')
+    else:
+        form = RoomForm()
+        # Pre-fill lokasi untuk admin biasa
+        if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            form.fields['kost_location'].initial = request.user.admin_profile.assigned_location
+            form.fields['kost_location'].queryset = KostLocation.objects.filter(pk=request.user.admin_profile.assigned_location.pk)
+    
+    return render(request, 'core/room_form.html', {'form': form, 'title': 'Tambah Kamar'})
+
+@login_required(login_url='/accounts/login/')
+def room_update(request, pk):
+    """
+    Edit Data Kamar (B-CRUD-04)
+    """
+    room = get_object_or_404(Room, pk=pk)
+    
+    # Security: Cek kepemilikan lokasi
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke kamar ini.")
+                return redirect('room_list')
+        else:
+            return redirect('dashboard')
+    
+    if request.method == 'POST':
+        form = RoomForm(request.POST, instance=room)
+        if form.is_valid():
+            updated_room = form.save(commit=False)
+            if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+                updated_room.kost_location = request.user.admin_profile.assigned_location
+            updated_room.save()
+            messages.success(request, f"Kamar {room.room_number} berhasil diperbarui.")
+            return redirect('room_list')
+    else:
+        form = RoomForm(instance=room)
+        if not request.user.is_superuser and hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            form.fields['kost_location'].queryset = KostLocation.objects.filter(pk=request.user.admin_profile.assigned_location.pk)
+    
+    return render(request, 'core/room_form.html', {'form': form, 'title': f'Edit Kamar {room.room_number}'})
+
+@require_POST
+@login_required(login_url='/accounts/login/')
+def room_delete(request, pk):
+    """
+    Hapus Kamar (B-CRUD-04) — Hanya jika tidak ada kontrak aktif
+    """
+    room = get_object_or_404(Room, pk=pk)
+    
+    # Security
+    if not request.user.is_superuser:
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if room.kost_location != request.user.admin_profile.assigned_location:
+                messages.error(request, "Anda tidak memiliki akses ke kamar ini.")
+                return redirect('room_list')
+        else:
+            return redirect('dashboard')
+    
+    # Cek apakah kamar sedang ditempati
+    if room.contracts.filter(is_active=True).exists():
+        messages.error(request, f"Kamar {room.room_number} tidak bisa dihapus karena masih ada penghuni aktif.")
+        return redirect('room_list')
+    
+    room_number = room.room_number
+    room.delete()
+    messages.success(request, f"Kamar '{room_number}' berhasil dihapus.")
+    return redirect('room_list')

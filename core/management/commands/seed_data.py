@@ -19,7 +19,7 @@ class Command(BaseCommand):
     help = 'Mengisi database dengan data dummy AKURAT (Ancol=40, Kana=6, UNS=22)'
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("🌱 Memulai Seeding Data Akurat...")
+        self.stdout.write("Memulai Seeding Data Akurat...")
 
         # 1. Buat Superuser
         if not User.objects.filter(username='admin').exists():
@@ -75,10 +75,16 @@ class Command(BaseCommand):
         self.stdout.write("   + Semua Kamar berhasil dibuat sesuai jumlah real.")
 
         # 4. Buat Penghuni & Kontrak (Isi 80% dari total kamar yang ada)
-        all_rooms = list(Room.objects.all())
-        total_rooms = len(all_rooms)
-        target_tenants = int(total_rooms * 0.8) # 80% hunian
+        # C-DB-03: Hanya kamar yang belum punya kontrak (idempotent)
+        all_rooms = list(Room.objects.filter(contracts__isnull=True))
+        total_rooms = Room.objects.count()
         
+        if not all_rooms:
+            self.stdout.write(self.style.WARNING("   Semua kamar sudah terisi. Skip pembuatan tenant."))
+            self.stdout.write(self.style.SUCCESS(f"SEEDING AKURAT SELESAI! Total {total_rooms} Kamar, 0 Penghuni baru."))
+            return
+        
+        target_tenants = min(int(total_rooms * 0.8), len(all_rooms))
         occupied_rooms = random.sample(all_rooms, target_tenants)
 
         self.stdout.write(f"   + Mengisi {target_tenants} penghuni ke dalam kamar...")
@@ -132,4 +138,4 @@ class Command(BaseCommand):
                 status=chosen_status
             )
 
-        self.stdout.write(self.style.SUCCESS(f"✅ SEEDING AKURAT SELESAI! Total {total_rooms} Kamar, {target_tenants} Penghuni."))
+        self.stdout.write(self.style.SUCCESS(f"SEEDING AKURAT SELESAI! Total {total_rooms} Kamar, {target_tenants} Penghuni."))

@@ -39,18 +39,11 @@ class Invoice(models.Model):
     electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS')
     
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True) 
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, editable=False) 
     
-    def calculate_total(self):
-        """Fungsi bantu untuk hitung ulang total"""
-        total = self.base_rent_amount + self.electricity_bill_amount
-        self.total_amount = total
-        self.save() # Simpan perubahan
-
     def save(self, *args, **kwargs):
-        # Hitung total saat pertama kali save
-        if not self.total_amount:
-            self.total_amount = self.base_rent_amount + self.electricity_bill_amount
+        # Selalu hitung ulang total saat save (A-DATA-01 fix)
+        self.total_amount = self.base_rent_amount + self.electricity_bill_amount
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -68,9 +61,8 @@ class ElectricityReading(models.Model):
         # 1. Hitung pemakaian
         usage = self.meter_reading_end - self.meter_reading_start
         
-        # 2. Hitung biaya (Usage * Rate)
+        # 2. Safety check jika admin salah input (Akhir < Awal)
         if usage < 0:
-            # Safety check sederhana jika admin salah input (Akhir < Awal)
             usage = 0 
         
         self.calculated_amount = usage * self.rate_per_kwh
@@ -78,11 +70,9 @@ class ElectricityReading(models.Model):
         # 3. Simpan data diri sendiri dulu
         super().save(*args, **kwargs)
         
-        # 4. UPDATE OTOMATIS KE INVOICE INDUK
-        # Kita update field electricity_bill_amount di invoice terkait
+        # 4. UPDATE OTOMATIS KE INVOICE INDUK (A-DATA-01 fix: gunakan update langsung)
         self.invoice.electricity_bill_amount = self.calculated_amount
-        # Panggil fungsi hitung total di invoice
-        self.invoice.calculate_total()
+        self.invoice.save()  # Invoice.save() akan otomatis hitung ulang total
 
     def __str__(self):
         return f"Listrik Tagihan #{self.invoice.id}"

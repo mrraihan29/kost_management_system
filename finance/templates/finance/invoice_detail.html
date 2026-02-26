@@ -97,9 +97,12 @@
                             <i class="fas fa-image me-2"></i> Lihat Foto Bukti
                         </a>
                         {% if invoice.status == 'MENUNGGU_VERIFIKASI' %}
-                            <a href="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" class="btn btn-ink w-100" style="background-color: var(--color-success);">
-                                <i class="fas fa-check me-2"></i> Terima
-                            </a>
+                            <form method="post" action="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" class="w-100">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-ink w-100" style="background-color: var(--color-success);" onclick="return confirm('Terima pembayaran ini dan tandai LUNAS?')">
+                                    <i class="fas fa-check me-2"></i> Terima
+                                </button>
+                            </form>
                         {% endif %}
                     </div>
                 {% endif %}

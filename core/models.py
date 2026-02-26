@@ -17,6 +17,9 @@ class Room(models.Model):
     price_monthly = models.DecimalField(max_digits=12, decimal_places=2) # Harga dasar kamar
     is_token_electricity = models.BooleanField(default=False) # True=Token, False=Meteran Manual (FR-06)
     capacity = models.IntegerField(default=1)
-    
+
+    class Meta:
+        unique_together = ['kost_location', 'room_number']
+
     def __str__(self):
         return f"{self.kost_location.name} - {self.room_number}"

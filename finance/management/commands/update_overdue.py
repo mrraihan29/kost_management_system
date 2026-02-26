@@ -27,6 +27,6 @@ class Command(BaseCommand):
             #    Kita tidak pakai loop save() satu-satu agar cepat.
             rows_updated = overdue_invoices.update(status='TELAT_BAYAR')
             
-            self.stdout.write(self.style.SUCCESS(f"✅ Berhasil mengubah {rows_updated} tagihan menjadi TELAT_BAYAR."))
+            self.stdout.write(self.style.SUCCESS(f"Berhasil mengubah {rows_updated} tagihan menjadi TELAT_BAYAR."))
         else:
-            self.stdout.write(self.style.SUCCESS("✨ Tidak ada tagihan yang telat hari ini."))
+            self.stdout.write(self.style.SUCCESS("Tidak ada tagihan yang telat hari ini."))

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Daftar Kamar{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Manajemen Kamar</h2>
+        <p class="text-muted small mb-0">Total {{ total_rooms }} kamar — {{ occupied_rooms }} terisi</p>
+    </div>
+    <a href="{% url 'room_add' %}" class="btn btn-ink shadow-sm">
+        <i class="fas fa-plus me-2"></i>Tambah Kamar
+    </a>
+</div>
+
+{% if rooms %}
+<div class="card-paper">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr class="text-muted small text-uppercase">
+                    <th>No. Kamar</th>
+                    <th>Lokasi</th>
+                    <th>Harga/Bulan</th>
+                    <th>Kapasitas</th>
+                    <th>Listrik</th>
+                    <th>Status</th>
+                    <th class="text-end">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for room in rooms %}
+                <tr>
+                    <td class="fw-bold">{{ room.room_number }}</td>
+                    <td>{{ room.kost_location.name }}</td>
+                    <td>Rp {{ room.price_monthly|intcomma }}</td>
+                    <td>{{ room.capacity }} orang</td>
+                    <td>
+                        {% if room.is_token_electricity %}
+                            <span class="badge bg-info text-dark">Token</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Meteran</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if room.active_contract %}
+                            <span class="badge bg-success">Terisi</span>
+                            <small class="d-block text-muted">{{ room.active_contract.tenant.full_name }}</small>
+                        {% else %}
+                            <span class="badge bg-light text-muted border">Kosong</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'room_edit' room.pk %}" class="btn btn-sm btn-ink-outline me-1" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        {% if not room.active_contract %}
+                        <form method="post" action="{% url 'room_delete' room.pk %}" class="d-inline" onsubmit="return confirm('Hapus kamar {{ room.room_number }}?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card-paper text-center py-5">
+    <i class="fas fa-door-open fa-3x text-muted mb-3"></i>
+    <h5 class="text-muted">Belum ada data kamar</h5>
+    <p class="text-muted small">Klik tombol "Tambah Kamar" untuk mulai menambahkan kamar.</p>
+</div>
+{% endif %}
+{% endblock %}

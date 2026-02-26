@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
-{% load humanize %} <!-- Agar angka Rupiah rapi -->
+{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Dashboard Admin{% endblock %}
 
@@ -202,20 +203,27 @@
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 
-                                <!-- Tombol Approve -->
-                                <a href="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" class="btn btn-sm btn-ink" style="background-color: var(--color-success);" onclick="return confirm('Terima pembayaran ini dan tandai LUNAS?')">
-                                    <i class="fas fa-check"></i>
-                                </a>
+                                <!-- Tombol Approve (POST) -->
+                                <form method="post" action="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-success);" onclick="return confirm('Terima pembayaran ini dan tandai LUNAS?')">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
                                 
-                                <!-- Tombol Reject -->
-                                <a href="{% url 'verify_payment' invoice.payments.last.id 'reject' %}" class="btn btn-sm btn-ink" style="background-color: var(--color-danger);" onclick="return confirm('Tolak pembayaran ini? Status akan kembali menjadi TELAT.')">
-                                    <i class="fas fa-times"></i>
-                                </a>
+                                <!-- Tombol Reject (POST with rejection note) -->
+                                <form method="post" action="{% url 'verify_payment' invoice.payments.last.id 'reject' %}" style="display:inline;" onsubmit="return confirmReject(this);">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="rejection_note" class="reject-note-input">
+                                    <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-danger);">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
                             </div>
                         {% else %}
                             <button class="btn btn-sm btn-light text-muted border" disabled>Belum Upload</button>
                             <!-- Tombol WA (Future) -->
-                            <a href="https://wa.me/{{ invoice.contract.tenant.phone_number }}" target="_blank" class="btn btn-sm btn-outline-success ms-1" title="Kirim WA">
+                            <a href="https://wa.me/{{ invoice.contract.tenant.phone_number|format_wa }}" target="_blank" class="btn btn-sm btn-outline-success ms-1" title="Kirim WA">
                                 <i class="fab fa-whatsapp"></i>
                             </a>
                         {% endif %}
@@ -234,4 +242,13 @@
         </table>
     </div>
 </div>
+
+<script>
+function confirmReject(form) {
+    var reason = prompt('Alasan penolakan (opsional):');
+    if (reason === null) return false; // User clicked Cancel
+    form.querySelector('.reject-note-input').value = reason;
+    return true;
+}
+</script>
 {% endblock %}

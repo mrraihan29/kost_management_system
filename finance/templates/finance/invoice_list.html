@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %} <!-- WAJIB ADA untuk intcomma -->
+{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Daftar Tagihan{% endblock %}
 
@@ -109,7 +110,7 @@
                         
                         <!-- TOMBOL WA (Hanya jika Belum Lunas / Telat) -->
                         {% if inv.status == 'BELUM_LUNAS' or inv.status == 'TELAT_BAYAR' %}
-                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|cut:'-'|cut:' ' }}?text=Halo%20{{ inv.contract.tenant.full_name }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
+                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|format_wa }}?text=Halo%20{{ inv.contract.tenant.full_name }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
                                 target="_blank" 
                                 class="btn btn-sm btn-outline-success me-1" 
                                 title="Kirim Tagihan via WA">
@@ -151,9 +152,28 @@
         </table>
     </div>
     
-    <!-- Footer Tabel -->
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
     <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
-        <small class="text-muted">Menampilkan data terbaru</small>
+        <small class="text-muted">Halaman {{ page_obj.number }} dari {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} tagihan)</small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page=1{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">&laquo;</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_obj.previous_page_number }}</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">{{ page_obj.next_page_number }}</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_status %}&status={{ current_status }}{% endif %}{% if search_query %}&q={{ search_query }}{% endif %}">&raquo;</a></li>
+                {% endif %}
+            </ul>
+        </nav>
     </div>
+    {% else %}
+    <div class="card-footer-clean bg-white border-0 d-flex justify-content-between align-items-center py-3">
+        <small class="text-muted">Menampilkan semua data ({{ page_obj.paginator.count }} tagihan)</small>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
