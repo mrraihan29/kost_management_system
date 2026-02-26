@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
 
 from core.models import KostLocation, Room
 from users.models import AdminProfile
@@ -65,6 +66,7 @@ class FullBusinessProcessTest(TestCase):
         self.admin_kana_client = Client()
         self.admin_uns_client = Client()
         self.public_client = Client()  # For tenant portal
+        self.plain_user_client = Client()
 
         # 0.1 — Create Superuser
         self.superuser = User.objects.create_superuser(
@@ -122,11 +124,17 @@ class FullBusinessProcessTest(TestCase):
         )
         AdminProfile.objects.create(user=self.admin_uns, assigned_location=self.loc_uns)
 
+        self.plain_user = User.objects.create_user(
+            username='plain_user', password='plain123', is_staff=False,
+            first_name='Plain', last_name='User'
+        )
+
         # Login all clients
         self.superuser_client.login(username='admin', password='admin123')
         self.admin_ancol_client.login(username='admin_ancol', password='staff123')
         self.admin_kana_client.login(username='admin_kana', password='staff123')
         self.admin_uns_client.login(username='admin_uns', password='staff123')
+        self.plain_user_client.login(username='plain_user', password='plain123')
 
     # ================================================================
     # PHASE 0: INFRASTRUCTURE TESTS (F-45, F-46, F-01)
@@ -383,6 +391,27 @@ class FullBusinessProcessTest(TestCase):
         kana_room.refresh_from_db()
         self.assertNotEqual(kana_room.price_monthly, Decimal('9999999'))
 
+    def test_phase3_08_room_list_natural_ordering(self):
+        """UI data order: room numbers should use natural sort (2 before 10)."""
+        Room.objects.create(
+            kost_location=self.loc_ancol,
+            room_number='2',
+            price_monthly=Decimal('1200000'),
+            capacity=1,
+        )
+        Room.objects.create(
+            kost_location=self.loc_ancol,
+            room_number='10',
+            price_monthly=Decimal('1200000'),
+            capacity=1,
+        )
+
+        resp = self.admin_ancol_client.get(reverse('room_list'))
+        self.assertEqual(resp.status_code, 200)
+
+        ordered_numbers = [room.room_number for room in resp.context['rooms']]
+        self.assertLess(ordered_numbers.index('2'), ordered_numbers.index('10'))
+
     # ================================================================
     # PHASE 4: TENANT ONBOARDING
     # ================================================================
@@ -578,6 +607,25 @@ class FullBusinessProcessTest(TestCase):
         resp = self.admin_ancol_client.get(reverse('invoice_list') + '?q=Billing')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Billing Tenant')
+
+    def test_phase6_05b_invoice_list_auto_sync_overdue_status(self):
+        """Invoice list auto-updates BELUM_LUNAS overdue invoices to TELAT_BAYAR."""
+        tenant, contract = self._setup_billing_data()
+        invoice = Invoice.objects.create(
+            contract=contract,
+            billing_period_start=date.today() - timedelta(days=35),
+            due_date=date.today() - timedelta(days=3),
+            base_rent_amount=Decimal('1500000'),
+            electricity_bill_amount=0,
+            total_amount=Decimal('1500000'),
+            status='BELUM_LUNAS'
+        )
+
+        resp = self.admin_ancol_client.get(reverse('invoice_list'))
+        self.assertEqual(resp.status_code, 200)
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'TELAT_BAYAR')
 
     def test_phase6_06_invoice_detail_and_electricity(self):
         """F-26: Input electricity meter reading updates invoice total."""
@@ -1154,6 +1202,31 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, 'Kana cost')
 
+    def test_phase10_07_operation_total_expenses_uses_all_recorded_data(self):
+        """Operational total card sums all recorded expenses, not only current month."""
+        OperationCost.objects.create(
+            kost_location=self.loc_ancol,
+            admin=self.admin_ancol,
+            category='LISTRIK',
+            amount=Decimal('100000'),
+            description='Biaya bulan ini',
+            incurred_date=date.today(),
+            proof_file='operation_costs/test1.jpg'
+        )
+        OperationCost.objects.create(
+            kost_location=self.loc_ancol,
+            admin=self.admin_ancol,
+            category='PAM',
+            amount=Decimal('250000'),
+            description='Biaya bulan lalu',
+            incurred_date=date.today() - timedelta(days=40),
+            proof_file='operation_costs/test2.jpg'
+        )
+
+        resp = self.admin_ancol_client.get(reverse('operation_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['total_expenses'], Decimal('350000'))
+
     # ================================================================
     # PHASE 11: FINANCIAL REPORTING
     # ================================================================
@@ -1437,6 +1510,76 @@ class FullBusinessProcessTest(TestCase):
             reverse('verify_payment', args=[payment.pk, 'approve'])
         )
         self.assertEqual(resp.status_code, 405)
+
+    def test_phase13_11_plain_user_cannot_create_tenant(self):
+        """Security: Non-staff user must not create tenant records."""
+        resp = self.plain_user_client.post(reverse('tenant_add'), {
+            'full_name': 'Unauthorized Tenant',
+            'phone_number': '0812345',
+            'emergency_contact_phone': '0899999',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Tenant.objects.filter(full_name='Unauthorized Tenant').exists())
+
+    def test_phase13_12_plain_user_cannot_create_room(self):
+        """Security: Non-staff user must not create room records."""
+        resp = self.plain_user_client.post(reverse('room_add'), {
+            'kost_location': self.loc_ancol.pk,
+            'room_number': 'X-999',
+            'price_monthly': '1200000',
+            'is_token_electricity': False,
+            'capacity': 1,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Room.objects.filter(room_number='X-999').exists())
+
+    def test_phase13_13_plain_user_cannot_assign_room(self):
+        """Security: Non-staff user must not assign tenant to room."""
+        tenant = Tenant.objects.create(
+            full_name='Unauthorized Assign Tenant',
+            phone_number='081111',
+            emergency_contact_phone='082222'
+        )
+        resp = self.plain_user_client.post(
+            reverse('tenant_assign_room', args=[tenant.pk]),
+            {
+                'room': self.rooms['A-101'].pk,
+                'start_date': date.today().isoformat(),
+                'monthly_rent_amount': '1500000',
+            }
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(TenantContract.objects.filter(tenant=tenant, is_active=True).exists())
+
+    def test_phase13_14_prevent_double_active_contract_same_room(self):
+        """Data integrity: A room cannot have more than one active contract."""
+        tenant1 = Tenant.objects.create(
+            full_name='Integrity Tenant 1',
+            phone_number='081333',
+            emergency_contact_phone='082333'
+        )
+        tenant2 = Tenant.objects.create(
+            full_name='Integrity Tenant 2',
+            phone_number='081444',
+            emergency_contact_phone='082444'
+        )
+
+        TenantContract.objects.create(
+            tenant=tenant1,
+            room=self.rooms['A-103'],
+            start_date=date.today(),
+            monthly_rent_amount=Decimal('1500000'),
+            is_active=True,
+        )
+
+        with self.assertRaises(ValidationError):
+            TenantContract.objects.create(
+                tenant=tenant2,
+                room=self.rooms['A-103'],
+                start_date=date.today(),
+                monthly_rent_amount=Decimal('1500000'),
+                is_active=True,
+            )
 
     # ================================================================
     # PHASE 14: MANAGEMENT COMMANDS

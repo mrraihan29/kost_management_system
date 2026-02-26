@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from .models import Tenant
 from .models import TenantContract
 from core.models import Room
@@ -48,8 +49,16 @@ class TenantContractForm(forms.ModelForm):
         if user and not user.is_superuser:
             if hasattr(user, 'admin_profile') and user.admin_profile.assigned_location:
                 rooms_query = rooms_query.filter(kost_location=user.admin_profile.assigned_location)
+            else:
+                rooms_query = Room.objects.none()
         
         # 2. Filter hanya yang TIDAK punya kontrak aktif
         # (Exclude kamar yang ID-nya ada di daftar kontrak aktif)
         occupied_room_ids = TenantContract.objects.filter(is_active=True).values_list('room_id', flat=True)
         self.fields['room'].queryset = rooms_query.exclude(id__in=occupied_room_ids)
+
+    def clean_room(self):
+        room = self.cleaned_data.get('room')
+        if room and room not in self.fields['room'].queryset:
+            raise ValidationError('Kamar tidak valid atau tidak dapat diakses.')
+        return room

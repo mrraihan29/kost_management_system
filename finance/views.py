@@ -4,6 +4,7 @@ from core.models import Room, KostLocation
 from tenants.models import TenantContract, MaintenanceTicket
 from .models import Invoice, Payment, ElectricityReading, OperationCost
 from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, OperationCostForm, MaintenanceForm, ReportFilterForm
+from .services import sync_overdue_invoice_statuses
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q, Sum, Count
@@ -204,6 +205,8 @@ def invoice_list(request):
     """
     Halaman Daftar Semua Tagihan (Admin) - FIXED SECURITY
     """
+    sync_overdue_invoice_statuses()
+
     status_filter = request.GET.get('status')
     search_query = request.GET.get('q')
 
@@ -311,12 +314,7 @@ def operation_list(request):
         else:
             costs = costs.none()
 
-    # G-02 fix: Total pengeluaran bulan ini saja (bukan semua waktu)
-    today = timezone.now().date()
-    total_expenses = costs.filter(
-        incurred_date__year=today.year,
-        incurred_date__month=today.month
-    ).aggregate(Sum('amount'))['amount__sum'] or 0
+    total_expenses = costs.aggregate(Sum('amount'))['amount__sum'] or 0
 
     # C-PAGE-03: Pagination
     paginator = Paginator(costs, 25)

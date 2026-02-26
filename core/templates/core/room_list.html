@@ -16,24 +16,24 @@
 </div>
 
 {% if rooms %}
-<div class="card-paper">
+<div class="card-paper overflow-hidden">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
+        <table class="table align-middle mb-0 table-hover">
+            <thead style="background-color: var(--color-primary-light);">
                 <tr class="text-muted small text-uppercase">
-                    <th>No. Kamar</th>
-                    <th>Lokasi</th>
-                    <th>Harga/Bulan</th>
-                    <th>Kapasitas</th>
-                    <th>Listrik</th>
-                    <th>Status</th>
-                    <th class="text-end">Aksi</th>
+                    <th class="ps-4 py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">No. Kamar</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Lokasi</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Harga/Bulan</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Kapasitas</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Listrik</th>
+                    <th class="py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Status</th>
+                    <th class="pe-4 py-3 text-uppercase small fw-bold text-end" style="color: var(--color-primary);">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for room in rooms %}
-                <tr>
-                    <td class="fw-bold">{{ room.room_number }}</td>
+                <tr style="border-bottom: 1px solid var(--color-border);">
+                    <td class="ps-4 fw-bold">{{ room.room_number }}</td>
                     <td>{{ room.kost_location.name }}</td>
                     <td>Rp {{ room.price_monthly|intcomma }}</td>
                     <td>{{ room.capacity }} orang</td>
@@ -52,18 +52,20 @@
                             <span class="badge bg-light text-muted border">Kosong</span>
                         {% endif %}
                     </td>
-                    <td class="text-end">
-                        <a href="{% url 'room_edit' room.pk %}" class="btn btn-sm btn-ink-outline me-1" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </a>
-                        {% if not room.active_contract %}
-                        <form method="post" action="{% url 'room_delete' room.pk %}" class="d-inline" onsubmit="return confirm('Hapus kamar {{ room.room_number }}?')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </form>
-                        {% endif %}
+                    <td class="pe-4 text-end">
+                        <div class="d-inline-flex align-items-center gap-2">
+                            <a href="{% url 'room_edit' room.pk %}" class="btn btn-sm btn-ink-outline" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% if not room.active_contract %}
+                            <form method="post" action="{% url 'room_delete' room.pk %}" class="d-inline" onsubmit="return confirm('Hapus kamar {{ room.room_number }}?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

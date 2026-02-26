@@ -9,9 +9,27 @@ from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView, UpdateView
 from django.contrib.messages.views import SuccessMessageMixin
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from .forms import TenantForm, TenantContractForm
 from django.utils import timezone
+
+
+class StaffWithLocationRequiredMixin(UserPassesTestMixin):
+    """Hanya superuser atau staff dengan assigned_location yang boleh mengakses."""
+
+    def test_func(self):
+        user = self.request.user
+        if user.is_superuser:
+            return True
+        return (
+            user.is_staff
+            and hasattr(user, 'admin_profile')
+            and user.admin_profile.assigned_location is not None
+        )
+
+    def handle_no_permission(self):
+        messages.error(self.request, "Akses ditolak. Hanya admin/staff yang ditugaskan lokasi.")
+        return redirect('dashboard')
 
 @login_required(login_url='/accounts/login/')
 def tenant_list(request):
@@ -64,7 +82,7 @@ def tenant_list(request):
     }
     return render(request, 'tenants/tenant_list.html', context)
 
-class TenantCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class TenantCreateView(LoginRequiredMixin, StaffWithLocationRequiredMixin, SuccessMessageMixin, CreateView):
     model = Tenant
     form_class = TenantForm
     template_name = 'tenants/tenant_form.html'
@@ -173,7 +191,7 @@ def tenant_delete(request, pk):
     messages.success(request, f"Data penghuni '{tenant_name}' berhasil dihapus.")
     return redirect('tenant_list')
 
-class TenantContractCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class TenantContractCreateView(LoginRequiredMixin, StaffWithLocationRequiredMixin, SuccessMessageMixin, CreateView):
     model = TenantContract
     form_class = TenantContractForm
     template_name = 'tenants/assign_room.html'

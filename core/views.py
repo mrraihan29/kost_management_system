@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from finance.models import Invoice, Payment
+from finance.services import sync_overdue_invoice_statuses
 from tenants.models import TenantContract
 from core.models import Room, KostLocation
 from django.db.models import Sum, Prefetch
@@ -8,6 +9,7 @@ from .forms import KostLocationForm, RoomForm
 from django.contrib import messages
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+import re
 # --- VIEW 1: LANDING PAGE (YANG HILANG) ---
 def home(request):
     """
@@ -25,6 +27,8 @@ def admin_dashboard(request):
     """
     Dashboard Utama (Dengan Filter Superuser & Peta Visual)
     """
+    sync_overdue_invoice_statuses()
+
     # Base Query
     invoices = Invoice.objects.all()
     rooms = Room.objects.all().order_by('room_number')
@@ -193,8 +197,23 @@ def room_list(request):
         else:
             rooms = rooms.none()
     
-    # Tambahkan info okupansi ke setiap room
     rooms = list(rooms)
+
+    def room_sort_key(room):
+        parts = re.split(r'(\d+)', (room.room_number or '').lower())
+        key_parts = []
+        for part in parts:
+            if not part:
+                continue
+            if part.isdigit():
+                key_parts.append((0, int(part)))
+            else:
+                key_parts.append((1, part))
+        return key_parts
+
+    rooms.sort(key=room_sort_key)
+
+    # Tambahkan info okupansi ke setiap room
     for room in rooms:
         room.active_contract = room.contracts.filter(is_active=True).select_related('tenant').first()
     
@@ -210,6 +229,14 @@ def room_create(request):
     """
     Form Tambah Kamar (B-CRUD-04)
     """
+    if not request.user.is_superuser:
+        if not request.user.is_staff:
+            messages.error(request, "Akses ditolak. Hanya admin/staff yang dapat menambah kamar.")
+            return redirect('dashboard')
+        if not hasattr(request.user, 'admin_profile') or not request.user.admin_profile.assigned_location:
+            messages.error(request, "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun.")
+            return redirect('dashboard')
+
     if request.method == 'POST':
         form = RoomForm(request.POST)
         if form.is_valid():

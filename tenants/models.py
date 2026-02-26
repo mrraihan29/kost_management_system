@@ -1,6 +1,8 @@
 import uuid
 import os
 from django.db import models
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 from core.models import Room
 import random
 import string
@@ -39,11 +41,42 @@ class TenantContract(models.Model):
     
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['room'],
+                condition=Q(is_active=True),
+                name='uniq_active_contract_per_room',
+            ),
+            models.UniqueConstraint(
+                fields=['tenant'],
+                condition=Q(is_active=True),
+                name='uniq_active_contract_per_tenant',
+            ),
+        ]
+
+    def clean(self):
+        if not self.is_active:
+            return
+
+        room = getattr(self, 'room', None)
+        tenant = getattr(self, 'tenant', None)
+
+        if not room or not tenant:
+            return
+
+        if TenantContract.objects.filter(room=room, is_active=True).exclude(pk=self.pk).exists():
+            raise ValidationError({'room': 'Kamar ini sudah memiliki kontrak aktif.'})
+
+        if TenantContract.objects.filter(tenant=tenant, is_active=True).exclude(pk=self.pk).exists():
+            raise ValidationError({'tenant': 'Tenant ini sudah memiliki kontrak aktif.'})
+
     # --- OVERRIDE SAVE ---
     def save(self, *args, **kwargs):
         # Jika PIN kosong, generate baru
         if not self.payment_pin:
             self.payment_pin = self.generate_unique_pin()
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def generate_unique_pin(self):
