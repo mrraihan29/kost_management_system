@@ -139,7 +139,7 @@
                                     <form method="post" action="{% url 'tenant_delete' tenant.pk %}" style="display:inline;">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus Data"
-                                            onclick="return confirm('Yakin hapus data {{ tenant.full_name }}? Semua riwayat kontrak dan tagihan akan ikut terhapus.')">
+                                            onclick="return confirm('Yakin hapus data {{ tenant.full_name|escapejs }}? Semua riwayat kontrak dan tagihan akan ikut terhapus.')">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </form>

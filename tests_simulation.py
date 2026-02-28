@@ -161,7 +161,7 @@ class FullBusinessProcessTest(TestCase):
 
     def test_phase0_04_django_admin(self):
         """F-46: Django admin panel accessible by superuser."""
-        resp = self.superuser_client.get('/admin/')
+        resp = self.superuser_client.get('/sekretariat-evykost/')
         self.assertEqual(resp.status_code, 200)
 
     # ================================================================

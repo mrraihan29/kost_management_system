@@ -5,6 +5,7 @@ from tenants.models import TenantContract, MaintenanceTicket
 from .models import Invoice, Payment, ElectricityReading, OperationCost
 from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, OperationCostForm, MaintenanceForm, ReportFilterForm
 from .services import sync_overdue_invoice_statuses
+from config.security import check_rate_limit, record_failed_attempt, reset_rate_limit, log_action
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Q, Sum, Count
@@ -21,8 +22,21 @@ from openpyxl.utils import get_column_letter
 def public_payment_step1(request):
     """
     Langkah 1: Halaman Validasi PIN
+    SEC-01: Dilindungi rate limiting (5 percobaan / 15 menit per IP)
     """
-    # Jika form di-submit (POST)
+    # SEC-01: Cek apakah IP sudah diblokir karena terlalu banyak gagal
+    is_blocked, attempts, retry_after = check_rate_limit(
+        request, key_prefix='pin_attempt', max_attempts=5, window=900
+    )
+    if is_blocked:
+        retry_minutes = max(1, retry_after // 60)
+        messages.error(
+            request,
+            f"Terlalu banyak percobaan gagal. Coba lagi dalam {retry_minutes} menit."
+        )
+        form = PinValidationForm()
+        return render(request, 'finance/step1_pin.html', {'form': form})
+
     if request.method == 'POST':
         form = PinValidationForm(request.POST)
         if form.is_valid():
@@ -35,6 +49,8 @@ def public_payment_step1(request):
             try:
                 room = Room.objects.get(kost_location=location, room_number__iexact=room_num)
             except Room.DoesNotExist:
+                # SEC-01: Catat percobaan gagal
+                record_failed_attempt(request, key_prefix='pin_attempt', window=900)
                 messages.error(request, "Kamar tidak ditemukan di lokasi tersebut.")
                 return render(request, 'finance/step1_pin.html', {'form': form})
 
@@ -42,16 +58,27 @@ def public_payment_step1(request):
             try:
                 contract = TenantContract.objects.get(room=room, payment_pin=pin, is_active=True)
             except TenantContract.DoesNotExist:
+                # SEC-01: Catat percobaan gagal
+                record_failed_attempt(request, key_prefix='pin_attempt', window=900)
                 messages.error(request, "PIN salah atau Kontrak tidak aktif.")
                 return render(request, 'finance/step1_pin.html', {'form': form})
 
             # --- JIKA SUKSES ---
-            # Simpan ID kontrak di Session (Saku Browser)
+            # SEC-01: Reset counter karena berhasil
+            reset_rate_limit(request, key_prefix='pin_attempt')
+
+            # Simpan ID kontrak di Session
             request.session['verified_contract_id'] = contract.id
-            request.session.set_expiry(1800)  # B-FLOW-05 fix: Session expires in 30 minutes
+            request.session.set_expiry(1800)  # 30 menit
+
+            # SEC-12: Log successful PIN authentication
+            log_action(request, 'PIN_AUTH_SUCCESS',
+                       f'Contract #{contract.id}',
+                       f'Tenant: {contract.tenant.full_name}, Room: {room.room_number}')
+
             messages.success(request, f"Halo, {contract.tenant.full_name}! Silakan upload bukti bayar.")
             return redirect('public_payment_step2')
-    
+
     else:
         form = PinValidationForm()
 
@@ -172,12 +199,17 @@ def verify_payment(request, payment_id, action):
         # Update Invoice jadi LUNAS
         invoice.status = 'LUNAS'
         invoice.save()
-        
+
         # Update Payment Info
         payment.verified_by = request.user
         payment.verified_at = timezone.now()
         payment.save()
-        
+
+        # SEC-12: Audit log approval
+        log_action(request, 'PAYMENT_APPROVED',
+                   f'Invoice #{invoice.id}',
+                   f'Tenant: {invoice.contract.tenant.full_name}, Amount: {invoice.total_amount}')
+
         messages.success(request, f"Pembayaran {invoice.contract.tenant.full_name} disetujui.")
 
     elif action == 'reject':
@@ -188,17 +220,22 @@ def verify_payment(request, payment_id, action):
         else:
             invoice.status = 'BELUM_LUNAS'
         invoice.save()
-        
+
         # Update Payment Info (B-FLOW-03 fix: Custom rejection note)
         payment.verified_by = request.user
         payment.verified_at = timezone.now()
         custom_note = request.POST.get('rejection_note', '').strip()
         payment.rejection_note = custom_note if custom_note else "Bukti tidak valid (Ditolak Admin)"
         payment.save()
-        
+
+        # SEC-12: Audit log rejection
+        log_action(request, 'PAYMENT_REJECTED',
+                   f'Invoice #{invoice.id}',
+                   f'Tenant: {invoice.contract.tenant.full_name}, Reason: {payment.rejection_note}')
+
         messages.error(request, f"Pembayaran {invoice.contract.tenant.full_name} DITOLAK.")
 
-    return redirect('dashboard') # Kembali ke dashboard
+    return redirect('dashboard')
 
 @login_required(login_url='/accounts/login/')
 def invoice_list(request):
@@ -404,6 +441,10 @@ def operation_delete(request, pk):
             return redirect('dashboard')
     
     cost.delete()
+    # SEC-12: Audit log deletion
+    log_action(request, 'OPERATION_COST_DELETED',
+               f'OperationCost #{pk}',
+               f'Category: {cost.get_category_display()}, Amount: {cost.amount}')
     messages.success(request, "Data pengeluaran berhasil dihapus.")
     return redirect('operation_list')
 

@@ -3,6 +3,9 @@ from django.core.exceptions import ValidationError
 from .models import Tenant
 from .models import TenantContract
 from core.models import Room
+from finance.forms import validate_image_file  # Reuse existing validator
+
+
 class TenantForm(forms.ModelForm):
     class Meta:
         model = Tenant
@@ -19,6 +22,13 @@ class TenantForm(forms.ModelForm):
             'emergency_contact_phone': 'Kontak Darurat',
             'ktp_photo': 'Foto KTP (Opsional)',
         }
+
+    def clean_ktp_photo(self):
+        """SEC-11b: Validasi file KTP (ukuran max 5MB, format gambar saja)."""
+        f = self.cleaned_data.get('ktp_photo')
+        if f:
+            validate_image_file(f)
+        return f
         
 class TenantContractForm(forms.ModelForm):
     """

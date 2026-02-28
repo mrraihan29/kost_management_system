@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Prefetch
 from django.contrib import messages
 from .models import Tenant, TenantContract
+from config.security import log_action
 from finance.models import Invoice
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
@@ -156,7 +157,12 @@ def tenant_checkout(request, pk):
         # 2. Catat tanggal keluar (Hari ini)
         active_contract.end_date = timezone.now().date()
         active_contract.save()
-        
+
+        # SEC-12: Audit log checkout
+        log_action(request, 'TENANT_CHECKOUT',
+                   f'Tenant #{tenant.pk}',
+                   f'Name: {tenant.full_name}, Room: {active_contract.room.room_number}')
+
         messages.success(request, f"Penghuni {tenant.full_name} berhasil di-Check Out. Kamar sekarang kosong.")
     else:
         messages.warning(request, "Penghuni ini tidak memiliki kontrak aktif.")
@@ -188,6 +194,10 @@ def tenant_delete(request, pk):
     
     tenant_name = tenant.full_name
     tenant.delete()
+    # SEC-12: Audit log deletion
+    log_action(request, 'TENANT_DELETED',
+               f'Tenant #{pk}',
+               f'Name: {tenant_name}')
     messages.success(request, f"Data penghuni '{tenant_name}' berhasil dihapus.")
     return redirect('tenant_list')
 

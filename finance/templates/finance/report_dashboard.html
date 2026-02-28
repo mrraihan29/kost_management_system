@@ -91,26 +91,40 @@
     </div>
 </div>
 
+<!-- SEC-04: Data di-inject via json_script (aman dari XSS), bukan |safe -->
+{{ chart_labels|json_script:"chart-labels-data" }}
+{{ chart_income|json_script:"chart-income-data" }}
+{{ chart_expense|json_script:"chart-expense-data" }}
+{{ pie_data|json_script:"pie-data-data" }}
+{{ pie_labels|json_script:"pie-labels-data" }}
+
 <!-- SCRIPT CHART.JS -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
 <script>
+    // SEC-04: Ambil data dari json_script (aman dari XSS)
+    const chartLabels = JSON.parse(document.getElementById('chart-labels-data').textContent);
+    const chartIncome = JSON.parse(document.getElementById('chart-income-data').textContent);
+    const chartExpense = JSON.parse(document.getElementById('chart-expense-data').textContent);
+    const pieData = JSON.parse(document.getElementById('pie-data-data').textContent);
+    const pieLabels = JSON.parse(document.getElementById('pie-labels-data').textContent);
+
     // 1. DATA CHART TREND
     const ctxTrend = document.getElementById('trendChart').getContext('2d');
     new Chart(ctxTrend, {
         type: 'bar',
         data: {
-            labels: {{ chart_labels|safe }},
+            labels: chartLabels,
             datasets: [
                 {
                     label: 'Pemasukan',
-                    data: {{ chart_income|safe }},
-                    backgroundColor: '#386641', // Hijau EKM
+                    data: chartIncome,
+                    backgroundColor: '#386641',
                     borderRadius: 4
                 },
                 {
                     label: 'Pengeluaran',
-                    data: {{ chart_expense|safe }},
-                    backgroundColor: '#BC4749', // Merah EKM
+                    data: chartExpense,
+                    backgroundColor: '#BC4749',
                     borderRadius: 4
                 }
             ]
@@ -124,13 +138,12 @@
 
     // 2. DATA CHART PIE (PENGELUARAN)
     const ctxExpense = document.getElementById('expenseChart').getContext('2d');
-    const pieData = {{ pie_data|safe }};
-    
+
     if (pieData.length > 0) {
         new Chart(ctxExpense, {
             type: 'doughnut',
             data: {
-                labels: {{ pie_labels|safe }},
+                labels: pieLabels,
                 datasets: [{
                     data: pieData,
                     backgroundColor: ['#BC4749', '#DDA15E', '#6A994E', '#386641', '#111827'],
@@ -145,7 +158,6 @@
             }
         });
     } else {
-        // Tampilkan pesan jika tidak ada data
         document.getElementById('expenseChart').parentElement.innerHTML = "<p class='text-muted text-center small my-5'>Belum ada data pengeluaran.</p>";
     }
 </script>

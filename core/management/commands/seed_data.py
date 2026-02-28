@@ -21,10 +21,12 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         self.stdout.write("Memulai Seeding Data Akurat...")
 
-        # 1. Buat Superuser
-        if not User.objects.filter(username='admin').exists():
-            User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
-            self.stdout.write("   + Superuser 'admin' (pass: admin123) dibuat.")
+        # SEC-15: TIDAK lagi auto-create superuser dengan password hardcoded.
+        # Buat superuser secara manual: python manage.py createsuperuser
+        if not User.objects.filter(is_superuser=True).exists():
+            self.stdout.write(self.style.WARNING(
+                "   ! Belum ada superuser. Buat manual: python manage.py createsuperuser"
+            ))
 
         # 2. Definisi Data Real (Nama, Alamat, Tarif, JUMLAH KAMAR)
         locations_config = [

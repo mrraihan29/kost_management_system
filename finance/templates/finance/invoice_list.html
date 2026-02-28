@@ -110,7 +110,7 @@
                         
                         <!-- TOMBOL WA (Hanya jika Belum Lunas / Telat) -->
                         {% if inv.status == 'BELUM_LUNAS' or inv.status == 'TELAT_BAYAR' %}
-                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|format_wa }}?text=Halo%20{{ inv.contract.tenant.full_name }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
+                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|format_wa }}?text=Halo%20{{ inv.contract.tenant.full_name|urlencode }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number|urlencode }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
                                 target="_blank" 
                                 class="btn btn-sm btn-outline-success me-1" 
                                 title="Kirim Tagihan via WA">
