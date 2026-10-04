@@ -307,18 +307,32 @@ LOGGING = {
 
 # ──────────────────────────────────────────────
 # Cache (Diperlukan untuk rate limiting PIN — SEC-01)
+# B-04 fix: Gunakan DB cache di production untuk multi-worker support
 # ──────────────────────────────────────────────
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'ratelimit-cache',
+_cache_url = os.environ.get('CACHE_URL')  # e.g. redis://127.0.0.1:6379/1
+
+if _cache_url:
+    # Production: Redis jika tersedia
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _cache_url,
+        }
     }
-}
-# Production: Ganti dengan Redis untuk persistence dan multi-process support
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-#         'LOCATION': os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-#     }
-# }
+elif not DEBUG:
+    # Production tanpa Redis: gunakan DB cache (shared antar workers)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'cache_table',
+        }
+    }
+else:
+    # Development: LocMemCache cukup untuk single-process
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'ratelimit-cache',
+        }
+    }

@@ -16,7 +16,7 @@ class Room(models.Model):
     room_number = models.CharField(max_length=20)  # Cth: "A-101"
     price_monthly = models.DecimalField(max_digits=12, decimal_places=2) # Harga dasar kamar
     is_token_electricity = models.BooleanField(default=False) # True=Token, False=Meteran Manual (FR-06)
-    capacity = models.IntegerField(default=1)
+    capacity = models.IntegerField(default=1, help_text="Kapasitas kamar (informasi saja, tidak mempengaruhi assignment)")
 
     class Meta:
         unique_together = ['kost_location', 'room_number']

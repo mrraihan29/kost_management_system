@@ -178,6 +178,19 @@ def tenant_delete(request, pk):
     """
     tenant = get_object_or_404(Tenant, pk=pk)
     
+    # A-02 fix: Cek akses lokasi sebelum operasi delete
+    if not request.user.is_superuser:
+        tenant_locations = tenant.contracts.values_list(
+            'room__kost_location', flat=True
+        ).distinct()
+        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+            if request.user.admin_profile.assigned_location_id not in tenant_locations:
+                messages.error(request, "Anda tidak memiliki akses untuk menghapus penghuni ini.")
+                return redirect('tenant_list')
+        else:
+            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
+            return redirect('tenant_list')
+    
     # Cek apakah punya kontrak aktif
     if tenant.contracts.filter(is_active=True).exists():
         messages.error(request, f"Tidak bisa menghapus {tenant.full_name}. Masih ada kontrak aktif. Checkout dulu.")

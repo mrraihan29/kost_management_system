@@ -16,10 +16,16 @@
 </div>
 
 <!-- KARTU TOTAL -->
-<div class="row mb-4">
+<div class="row mb-4 g-3">
+    <div class="col-md-4">
+        <div class="card-paper bg-white p-4 border-start border-4 border-warning">
+            <h6 class="text-muted text-uppercase small fw-bold">Pengeluaran Bulan Ini</h6>
+            <h2 class="text-warning fw-bold mb-0 mt-2">Rp {{ monthly_expenses|intcomma }}</h2>
+        </div>
+    </div>
     <div class="col-md-4">
         <div class="card-paper bg-white p-4 border-start border-4 border-danger">
-            <h6 class="text-muted text-uppercase small fw-bold">Total Pengeluaran (Tercatat)</h6>
+            <h6 class="text-muted text-uppercase small fw-bold">Total Pengeluaran (Seluruh)</h6>
             <h2 class="text-danger fw-bold mb-0 mt-2">Rp {{ total_expenses|intcomma }}</h2>
         </div>
     </div>

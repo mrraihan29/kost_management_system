@@ -69,13 +69,14 @@ def admin_dashboard(request):
     total_pending = invoices.filter(status='MENUNGGU_VERIFIKASI').count()
     total_overdue = invoices.filter(status='TELAT_BAYAR').count()
     
-    # A-DATA-02 fix: Filter pemasukan bulan ini berdasarkan bulan & tahun saat ini
+    # A-06 fix: Pemasukan bulan ini berdasarkan tanggal verifikasi pembayaran,
+    # bukan billing_period_start, agar mencerminkan arus kas aktual.
     now = timezone.now()
     income_this_month = invoices.filter(
         status='LUNAS',
-        billing_period_start__month=now.month,
-        billing_period_start__year=now.year
-    ).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        payments__verified_at__month=now.month,
+        payments__verified_at__year=now.year
+    ).distinct().aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
     # --- DATA PETA VISUAL (FR-10) ---
     # C-PERF-01 fix: Prefetch untuk menghindari N+1 queries
@@ -188,7 +189,11 @@ def room_list(request):
     """
     Halaman Daftar Kamar (B-CRUD-04)
     """
-    rooms = Room.objects.all().select_related('kost_location').order_by('kost_location__name', 'room_number')
+    rooms = Room.objects.all().select_related('kost_location').prefetch_related(
+        Prefetch('contracts',
+                 queryset=TenantContract.objects.filter(is_active=True).select_related('tenant'),
+                 to_attr='active_contracts')
+    ).order_by('kost_location__name', 'room_number')
     
     # Filter Lokasi (Security)
     if not request.user.is_superuser:
@@ -213,9 +218,9 @@ def room_list(request):
 
     rooms.sort(key=room_sort_key)
 
-    # Tambahkan info okupansi ke setiap room
+    # B-02 fix: Gunakan prefetched data (tanpa N+1)
     for room in rooms:
-        room.active_contract = room.contracts.filter(is_active=True).select_related('tenant').first()
+        room.active_contract = room.active_contracts[0] if room.active_contracts else None
     
     context = {
         'rooms': rooms,

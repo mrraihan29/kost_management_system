@@ -144,7 +144,7 @@ class MaintenanceForm(forms.ModelForm):
             'title': 'Judul Masalah',
             'priority': 'Tingkat Urgensi',
             'description': 'Keterangan',
-            'photo': 'Foto Kerusakan (Wajib)',
+            'photo': 'Foto Kerusakan (Opsional)',
         }
 
     def clean_photo(self):

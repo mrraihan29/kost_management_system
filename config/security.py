@@ -195,3 +195,42 @@ def log_action(request, action, target, detail=''):
         "AUDIT | user=%s | ip=%s | action=%s | target=%s | detail=%s",
         user, ip, action, target, detail
     )
+
+
+# ──────────────────────────────────────────────
+# B-01: Location Access Helpers (DRY)
+# ──────────────────────────────────────────────
+
+def get_user_location(user):
+    """
+    Ambil assigned_location dari user.
+    Returns KostLocation instance atau None.
+    """
+    if user.is_superuser:
+        return None  # Superuser = akses global
+    if hasattr(user, 'admin_profile') and user.admin_profile.assigned_location:
+        return user.admin_profile.assigned_location
+    return None
+
+
+def filter_by_location(queryset, user, location_field='kost_location'):
+    """
+    Filter queryset berdasarkan lokasi user.
+    Superuser → tanpa filter. Admin biasa → filter ke lokasinya.
+    Admin tanpa lokasi → empty queryset.
+
+    Args:
+        queryset: Django QuerySet
+        user: User instance
+        location_field: Nama field/lookup ke KostLocation (e.g., 'kost_location',
+                       'contract__room__kost_location', 'room__kost_location')
+
+    Returns:
+        Filtered QuerySet
+    """
+    if user.is_superuser:
+        return queryset
+    location = get_user_location(user)
+    if location:
+        return queryset.filter(**{location_field: location})
+    return queryset.none()

@@ -353,6 +353,13 @@ def operation_list(request):
 
     total_expenses = costs.aggregate(Sum('amount'))['amount__sum'] or 0
 
+    # A-05 fix: KPI "Total Bulan Ini" terpisah dari total keseluruhan
+    now = timezone.now()
+    monthly_expenses = costs.filter(
+        incurred_date__month=now.month,
+        incurred_date__year=now.year
+    ).aggregate(Sum('amount'))['amount__sum'] or 0
+
     # C-PAGE-03: Pagination
     paginator = Paginator(costs, 25)
     page_number = request.GET.get('page')
@@ -361,7 +368,8 @@ def operation_list(request):
     context = {
         'costs': page_obj,
         'page_obj': page_obj,
-        'total_expenses': total_expenses
+        'total_expenses': total_expenses,
+        'monthly_expenses': monthly_expenses,
     }
     return render(request, 'finance/operation_list.html', context)
 
@@ -595,9 +603,29 @@ def admin_ticket_update(request, pk):
 
     if request.method == 'POST':
         new_status = request.POST.get('status')
-        # H-01 fix: Validasi status terhadap STATUS_CHOICES
+        # A-03 fix: Tegakkan state machine transitions
+        # PENDING → PROSES, DITOLAK
+        # PROSES → SELESAI, PENDING (rollback)
+        # SELESAI → final
+        # DITOLAK → final
+        VALID_TRANSITIONS = {
+            'PENDING': ['PROSES', 'DITOLAK'],
+            'PROSES': ['SELESAI', 'PENDING'],
+            'SELESAI': [],   # final state
+            'DITOLAK': [],   # final state
+        }
         valid_statuses = dict(MaintenanceTicket.STATUS_CHOICES)
+        allowed = VALID_TRANSITIONS.get(ticket.status, [])
+        
         if new_status and new_status in valid_statuses:
+            if new_status not in allowed:
+                messages.error(
+                    request,
+                    f"Tidak bisa mengubah status dari '{ticket.get_status_display()}' ke '{valid_statuses[new_status]}'. "
+                    f"Transisi yang diperbolehkan: {', '.join(valid_statuses[s] for s in allowed) if allowed else 'Tidak ada (status final)'}."
+                )
+                return redirect('ticket_list')
+            
             ticket.status = new_status
             
             # LOGIKA BARU: Jika Selesai, catat waktunya
@@ -614,7 +642,21 @@ def admin_ticket_update(request, pk):
             messages.error(request, "Status yang dipilih tidak valid.")
             return redirect('ticket_list')
 
-    return render(request, 'finance/ticket_detail.html', {'ticket': ticket})
+    # Pass valid transitions to template for dynamic dropdown
+    VALID_TRANSITIONS = {
+        'PENDING': ['PROSES', 'DITOLAK'],
+        'PROSES': ['SELESAI', 'PENDING'],
+        'SELESAI': [],
+        'DITOLAK': [],
+    }
+    allowed = VALID_TRANSITIONS.get(ticket.status, [])
+    status_labels = dict(MaintenanceTicket.STATUS_CHOICES)
+    valid_options = [(s, status_labels[s]) for s in allowed]
+
+    return render(request, 'finance/ticket_detail.html', {
+        'ticket': ticket,
+        'valid_options': valid_options,
+    })
 
 @login_required(login_url='/accounts/login/')
 def finance_report(request):
@@ -837,10 +879,11 @@ def generate_invoices_bulk(request):
                 # Ketentuan existing: jatuh tempo H+10 dari tanggal muncul tagihan
                 due_date = billing_start + relativedelta(days=10)
 
-            # Cek apakah sudah ada tagihan di periode tersebut?
+            # A-01 fix: Cek by month/year (konsisten dengan management command)
             exists = Invoice.objects.filter(
                 contract=contract,
-                billing_period_start=billing_start
+                billing_period_start__month=billing_start.month,
+                billing_period_start__year=billing_start.year
             ).exists()
 
             if not exists:

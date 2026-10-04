@@ -39,7 +39,7 @@ class TenantContract(models.Model):
     # PIN Pembayaran (FR-02) - Unik per kontrak
     payment_pin = models.CharField(max_length=6, unique=True, blank=True, help_text="PIN 6 digit unik. Terisi otomatis jika kosong.")
     
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         constraints = [
@@ -77,7 +77,19 @@ class TenantContract(models.Model):
         if not self.payment_pin:
             self.payment_pin = self.generate_unique_pin()
         self.full_clean()
-        super().save(*args, **kwargs)
+        # B-08 fix: Handle race condition — jika PIN sudah diambil antara
+        # check dan save, retry dengan PIN baru
+        from django.db import IntegrityError
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                super().save(*args, **kwargs)
+                return
+            except IntegrityError as e:
+                if 'payment_pin' in str(e) and attempt < max_retries - 1:
+                    self.payment_pin = self.generate_unique_pin()
+                else:
+                    raise
 
     def generate_unique_pin(self):
         # Loop sampai menemukan PIN yang belum dipakai (untuk hindari duplikat)

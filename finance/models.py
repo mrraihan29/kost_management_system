@@ -32,12 +32,12 @@ class Invoice(models.Model):
     ]
 
     contract = models.ForeignKey(TenantContract, on_delete=models.CASCADE, related_name='invoices')
-    billing_period_start = models.DateField()
-    due_date = models.DateField(help_text="Tanggal Jatuh Tempo (H-10)")
+    billing_period_start = models.DateField(db_index=True)
+    due_date = models.DateField(help_text="Tanggal Jatuh Tempo (H-10)", db_index=True)
     
     base_rent_amount = models.DecimalField(max_digits=12, decimal_places=2)
     electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS', db_index=True)
     
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, editable=False) 
     
@@ -111,7 +111,7 @@ class OperationCost(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField()
     proof_file = models.ImageField(upload_to=operation_cost_upload_path)
-    incurred_date = models.DateField(help_text="Tanggal pengeluaran terjadi")
+    incurred_date = models.DateField(help_text="Tanggal pengeluaran terjadi", db_index=True)
 
     def __str__(self):
         return f"{self.get_category_display()} - {self.kost_location.name} - {self.amount}"
