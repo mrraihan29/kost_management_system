@@ -1,8 +1,9 @@
 from decimal import Decimal
 import uuid
 import os
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from core.models import KostLocation
 from tenants.models import TenantContract
 
@@ -74,21 +75,38 @@ class ElectricityReading(models.Model):
     calculated_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True)
 
     def save(self, *args, **kwargs):
-        # 1. Hitung pemakaian
-        usage = self.meter_reading_end - self.meter_reading_start
-        
-        # 2. Safety check jika admin salah input (Akhir < Awal)
-        if usage < 0:
-            usage = 0 
-        
-        self.calculated_amount = usage * self.rate_per_kwh
-        
-        # 3. Simpan data diri sendiri dulu
-        super().save(*args, **kwargs)
-        
-        # 4. UPDATE OTOMATIS KE INVOICE INDUK (A-DATA-01 fix: gunakan update langsung)
-        self.invoice.electricity_bill_amount = self.calculated_amount
-        self.invoice.save()  # Invoice.save() akan otomatis hitung ulang total
+        # W2: serialize electricity writes against payment approval on the invoice row.
+        # The model is the single enforcement point: every caller (view, admin, scripts)
+        # acquires the Invoice lock first and re-checks LUNAS against the fresh locked row.
+        # Lock order for the whole app: Invoice first (the only locked row in this path).
+        with transaction.atomic():
+            invoice = None
+            if self.invoice_id:
+                invoice = Invoice.objects.select_for_update().get(pk=self.invoice_id)
+                if invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
+                    raise ValidationError(
+                        "Nilai listrik tidak dapat diubah pada tagihan yang sudah dibayar atau menunggu verifikasi."
+                    )
+
+            # 1. Hitung pemakaian
+            usage = self.meter_reading_end - self.meter_reading_start
+
+            # 2. Safety check jika admin salah input (Akhir < Awal)
+            if usage < 0:
+                usage = 0
+
+            self.calculated_amount = usage * self.rate_per_kwh
+
+            # 3. Simpan data diri sendiri dulu
+            super().save(*args, **kwargs)
+
+            # 4. UPDATE OTOMATIS KE INVOICE INDUK — memakai baris ter-lock yang segar
+            #    (mencegah overwrite status/amount stale dari objek lama)
+            if invoice is not None:
+                invoice.electricity_bill_amount = self.calculated_amount
+                invoice.save()  # Invoice.save() akan otomatis hitung ulang total
+                # Caller-side objects are intentionally NOT mutated: the DB row is
+                # the source of truth; callers must refresh if they re-read values.
 
     def __str__(self):
         return f"Listrik Tagihan #{self.invoice.id}"

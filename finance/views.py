@@ -7,8 +7,9 @@ from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, Operat
 from .services import sync_overdue_invoice_statuses
 from config.security import check_rate_limit, record_failed_attempt, reset_rate_limit, log_action
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum, Count
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, HttpResponseForbidden
@@ -104,24 +105,30 @@ def public_payment_step2(request):
     if request.method == 'POST':
         form = PaymentUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            # --- LOGIKA SIMPAN ---
-            payment = form.save(commit=False)
-            
-            # Jika tidak ada invoice aktif, buat invoice baru (opsional, tapi sementara kita wajibkan ada invoice)
-            if not active_invoice:
-                messages.error(request, "Tidak ada tagihan aktif yang perlu dibayar.")
-                return redirect('public_payment_step2')
+            # W2: serialize upload confirmation against approval/electricity writes.
+            # Lock order: Invoice first (the only locked row in this path).
+            with transaction.atomic():
+                locked_invoice = None
+                if active_invoice is not None:
+                    locked_invoice = Invoice.objects.select_for_update().filter(
+                        pk=active_invoice.pk
+                    ).first()
 
-            payment.invoice = active_invoice
-            payment.save()
+                # Re-check INSIDE the lock: the invoice may have been decided meanwhile
+                if locked_invoice is None or locked_invoice.status not in ('BELUM_LUNAS', 'TELAT_BAYAR'):
+                    messages.error(request, "Tidak ada tagihan aktif yang perlu dibayar.")
+                    return redirect('public_payment_step2')
 
-            # Update Status Invoice jadi 'MENUNGGU VERIFIKASI'
-            active_invoice.status = 'MENUNGGU_VERIFIKASI'
-            active_invoice.save()
+                payment = form.save(commit=False)
+                payment.invoice = locked_invoice
+                payment.save()
+
+                # Status-only write via queryset update: never rewrites totals from stale memory
+                Invoice.objects.filter(pk=locked_invoice.pk).update(status='MENUNGGU_VERIFIKASI')
 
             # Hapus sesi (Selesai)
             del request.session['verified_contract_id']
-            
+
             return render(request, 'finance/success.html')
     else:
         form = PaymentUploadForm()
@@ -196,57 +203,54 @@ def verify_payment(request, payment_id, action):
         messages.error(request, "Aksi tidak valid.")
         return redirect('dashboard')
 
-    if action == 'approve':
-        # W1/BQ-8: hanya Payment PENDING pada invoice MENUNGGU_VERIFIKASI yang bisa diputuskan
-        if payment.status != 'PENDING' or invoice.status != 'MENUNGGU_VERIFIKASI':
+    with transaction.atomic():
+        # W1: deterministic lock order — Invoice first, then Payment (same in every flow).
+        locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked_payment = Payment.objects.select_for_update().get(pk=payment.pk)
+
+        # W1/BQ-8: re-check state INSIDE the transaction; the losing request performs zero writes
+        if locked_payment.status != 'PENDING' or locked_invoice.status != 'MENUNGGU_VERIFIKASI':
             messages.error(request, "Pembayaran ini tidak dapat diproses (status tidak sesuai).")
             return redirect('dashboard')
 
-        # Update Invoice jadi LUNAS
-        invoice.status = 'LUNAS'
-        invoice.save()
+        if action == 'approve':
+            # Update Invoice jadi LUNAS
+            locked_invoice.status = 'LUNAS'
+            locked_invoice.save()
 
-        # Update Payment Info
-        payment.status = 'APPROVED'
-        payment.verified_by = request.user
-        payment.verified_at = timezone.now()
-        payment.save()
-
-        # SEC-12: Audit log approval
-        log_action(request, 'PAYMENT_APPROVED',
-                   f'Invoice #{invoice.id}',
-                   f'Tenant: {invoice.contract.tenant.full_name}, Amount: {invoice.total_amount}')
-
-        messages.success(request, f"Pembayaran {invoice.contract.tenant.full_name} disetujui.")
-
-    elif action == 'reject':
-        # W1/BQ-8: rejected bersifat final; guard sama dengan approve
-        if payment.status != 'PENDING' or invoice.status != 'MENUNGGU_VERIFIKASI':
-            messages.error(request, "Pembayaran ini tidak dapat diproses (status tidak sesuai).")
-            return redirect('dashboard')
-
-        # F-02 fix: Kembalikan status berdasarkan apakah sudah lewat jatuh tempo
-        today = timezone.now().date()
-        if invoice.due_date < today:
-            invoice.status = 'TELAT_BAYAR'
+            # Update Payment Info
+            locked_payment.status = 'APPROVED'
+            locked_payment.verified_by = request.user
+            locked_payment.verified_at = timezone.now()
+            locked_payment.save()
         else:
-            invoice.status = 'BELUM_LUNAS'
-        invoice.save()
+            # F-02 fix: Kembalikan status berdasarkan apakah sudah lewat jatuh tempo
+            today = timezone.now().date()
+            if locked_invoice.due_date < today:
+                locked_invoice.status = 'TELAT_BAYAR'
+            else:
+                locked_invoice.status = 'BELUM_LUNAS'
+            locked_invoice.save()
 
-        # Update Payment Info (B-FLOW-03 fix: Custom rejection note)
-        payment.status = 'REJECTED'
-        payment.verified_by = request.user
-        payment.verified_at = timezone.now()
-        custom_note = request.POST.get('rejection_note', '').strip()
-        payment.rejection_note = custom_note if custom_note else "Bukti tidak valid (Ditolak Admin)"
-        payment.save()
+            # Update Payment Info (B-FLOW-03 fix: Custom rejection note)
+            locked_payment.status = 'REJECTED'
+            locked_payment.verified_by = request.user
+            locked_payment.verified_at = timezone.now()
+            custom_note = request.POST.get('rejection_note', '').strip()
+            locked_payment.rejection_note = custom_note if custom_note else "Bukti tidak valid (Ditolak Admin)"
+            locked_payment.save()
 
-        # SEC-12: Audit log rejection
+    # SEC-12: audit log hanya untuk transisi yang sukses (setelah commit)
+    if action == 'approve':
+        log_action(request, 'PAYMENT_APPROVED',
+                   f'Invoice #{locked_invoice.id}',
+                   f'Tenant: {locked_invoice.contract.tenant.full_name}, Amount: {locked_invoice.total_amount}')
+        messages.success(request, f"Pembayaran {locked_invoice.contract.tenant.full_name} disetujui.")
+    else:
         log_action(request, 'PAYMENT_REJECTED',
-                   f'Invoice #{invoice.id}',
-                   f'Tenant: {invoice.contract.tenant.full_name}, Reason: {payment.rejection_note}')
-
-        messages.error(request, f"Pembayaran {invoice.contract.tenant.full_name} DITOLAK.")
+                   f'Invoice #{locked_invoice.id}',
+                   f'Tenant: {locked_invoice.contract.tenant.full_name}, Reason: {locked_payment.rejection_note}')
+        messages.error(request, f"Pembayaran {locked_invoice.contract.tenant.full_name} DITOLAK.")
 
     return redirect('dashboard')
 
@@ -321,24 +325,39 @@ def invoice_detail(request, pk):
 
     # Handle Form Listrik
     if request.method == 'POST':
-        # W3/BQ-5: paid or awaiting-verification invoices are financially immutable
-        if invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
-            messages.error(request, "Nilai tagihan ini tidak dapat diubah karena sudah dibayar atau menunggu verifikasi.")
-            return redirect('invoice_detail', pk=pk)
-        if invoice.contract.room.is_token_electricity:
-            messages.error(request, "Kamar ini menggunakan token; input meteran tidak diperlukan.")
-            return redirect('invoice_detail', pk=pk)
-        if electricity:
-            form = ElectricityForm(request.POST, instance=electricity)
-        else:
-            form = ElectricityForm(request.POST)
-        
-        if form.is_valid():
-            reading = form.save(commit=False)
-            reading.invoice = invoice # Hubungkan ke invoice ini
-            reading.save() # Logic save() di models.py akan otomatis hitung total
-            messages.success(request, "Data listrik berhasil disimpan & tagihan diupdate.")
-            return redirect('invoice_detail', pk=pk)
+        # W2: serialize electricity writes against payment verification on the invoice row.
+        # Lock order (all flows): Invoice first, then Payment (verify_payment: Invoice -> Payment).
+        with transaction.atomic():
+            locked_invoice = Invoice.objects.select_for_update().get(pk=pk)
+
+            # W2/W3/BQ-5: paid or awaiting-verification invoices are financially immutable
+            if locked_invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
+                messages.error(request, "Nilai tagihan ini tidak dapat diubah karena sudah dibayar atau menunggu verifikasi.")
+                return redirect('invoice_detail', pk=pk)
+            if locked_invoice.contract.room.is_token_electricity:
+                messages.error(request, "Kamar ini menggunakan token; input meteran tidak diperlukan.")
+                return redirect('invoice_detail', pk=pk)
+
+            electricity = ElectricityReading.objects.filter(invoice=locked_invoice).first()
+            if electricity:
+                form = ElectricityForm(request.POST, instance=electricity)
+            else:
+                form = ElectricityForm(request.POST)
+
+            if form.is_valid():
+                reading = form.save(commit=False)
+                reading.invoice = locked_invoice # Hubungkan ke invoice ini
+                try:
+                    reading.save() # Logic save() di models.py akan otomatis hitung total
+                except ValidationError:
+                    # W2: guard model menolak bila status berubah tanpa row-lock (mis. SQLite dev)
+                    messages.error(request, "Nilai tagihan ini tidak dapat diubah karena sudah dibayar atau menunggu verifikasi.")
+                    return redirect('invoice_detail', pk=pk)
+                messages.success(request, "Data listrik berhasil disimpan & tagihan diupdate.")
+                return redirect('invoice_detail', pk=pk)
+
+            # Invalid form: fall through and re-render with the bound form (zero writes)
+            invoice = locked_invoice
     else:
         # Pre-fill form jika data sudah ada
         if electricity:

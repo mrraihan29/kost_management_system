@@ -211,6 +211,10 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Tetap gunakan timer-based expiry
 SECURE_CONTENT_TYPE_NOSNIFF = True    # X-Content-Type-Options: nosniff
 X_FRAME_OPTIONS = 'DENY'             # Keras: deny semua framing (bukan SAMEORIGIN)
 
+# W3: healthcheck kontainer (http://localhost:8000/health/) tidak boleh kena
+# redirect HTTPS — curl -f menganggap 301 sukses sehingga cek DB tidak pernah jalan.
+SECURE_REDIRECT_EXEMPT = [r'^health/$']
+
 if not DEBUG:
     SECURE_SSL_REDIRECT = True                # Redirect HTTP → HTTPS
     SECURE_HSTS_SECONDS = 31536000            # HSTS: 1 tahun

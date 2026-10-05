@@ -20,7 +20,6 @@ class Command(BaseCommand):
 
         counts = Counter()
         approved_by_invoice = Counter()
-        marked_invoices = set()
         ambiguous = []
         warnings = []
 
@@ -29,26 +28,25 @@ class Command(BaseCommand):
             has_note = bool(note and note.strip())
             if has_note:
                 counts['REJECTED'] += 1
-                marked_invoices.add(invoice_id)
             elif verified_at is not None and inv_status == 'LUNAS':
                 counts['APPROVED'] += 1
                 approved_by_invoice[invoice_id] += 1
-                marked_invoices.add(invoice_id)
             elif verified_at is not None:
                 counts['UNCLASSIFIED'] += 1
-                marked_invoices.add(invoice_id)
                 ambiguous.append(
                     (payment_id, 'verified_at set but invoice is not LUNAS')
                 )
             else:
                 counts['PENDING'] += 1
 
-        # Invoice-level anomaly (no Payment row to classify): warning only,
-        # mirrors finance/0005 migration policy.
+        # W4: warning when a LUNAS invoice has no APPROVED payment evidence at all.
+        # Stricter than the finance/0005 backfill warning (which only requires any
+        # decision-marked payment); audit only — never repairs or invents data.
+        approved_invoices = set(approved_by_invoice)
         for invoice_id, status in invoice_status.items():
-            if status == 'LUNAS' and invoice_id not in marked_invoices:
+            if status == 'LUNAS' and invoice_id not in approved_invoices:
                 warnings.append(
-                    (f'invoice {invoice_id}', 'LUNAS invoice without decision-marked payment')
+                    (f'invoice {invoice_id}', 'LUNAS invoice without approved payment')
                 )
 
         for invoice_id, total in approved_by_invoice.items():

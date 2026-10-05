@@ -16,8 +16,10 @@ import calendar
 import tempfile
 from decimal import Decimal
 from datetime import date, datetime, timedelta, timezone as dt_timezone
+from unittest import mock
 
-from django.test import TestCase, Client, override_settings
+from django.conf import settings
+from django.test import TestCase, Client, RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -25,6 +27,8 @@ from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
+from django.db.models.query import QuerySet
+from django.http import HttpResponse
 
 from core.models import KostLocation, Room
 from users.models import AdminProfile
@@ -1784,12 +1788,13 @@ class FullBusinessProcessTest(TestCase):
     def test_phase6_13_electricity_edit_blocked_after_lunas(self):
         """W3: LUNAS invoice electricity reading cannot be edited."""
         tenant, contract, invoice = self._setup_payment_data()
-        invoice.status = 'LUNAS'
-        invoice.save()
         reading = ElectricityReading.objects.create(
             invoice=invoice, meter_reading_start=0, meter_reading_end=10,
             rate_per_kwh=Decimal('1500')
         )
+        invoice.refresh_from_db()  # W2: reading save uses a fresh locked row now
+        invoice.status = 'LUNAS'
+        invoice.save()
         resp = self.admin_ancol_client.post(
             reverse('invoice_detail', args=[invoice.pk]),
             {'meter_reading_start': 0, 'meter_reading_end': 100, 'rate_per_kwh': '1500.00'}
@@ -2098,6 +2103,8 @@ class FullBusinessProcessTest(TestCase):
         ma = InvoiceAdmin(Invoice, dj_admin.site)
         self.assertFalse(ma.has_delete_permission(None))
         tenant, contract, invoice, payment = self._setup_verification_data()
+        invoice.status = 'BELUM_LUNAS'  # genuinely open state (MENUNGGU is now locked too)
+        invoice.save()
         ro_open = ma.get_readonly_fields(None, invoice)
         self.assertIn('status', ro_open)
         self.assertIn('total_amount', ro_open)
@@ -2124,8 +2131,10 @@ class FullBusinessProcessTest(TestCase):
             rate_per_kwh=Decimal('1500')
         )
         self.assertEqual(ma.get_readonly_fields(None, reading), ('invoice',))
+        invoice.refresh_from_db()  # fresh amounts before flipping status
         invoice.status = 'LUNAS'
         invoice.save()
+        reading.refresh_from_db()  # reload FK state like the admin change view does
         ro = ma.get_readonly_fields(None, reading)
         self.assertIn('meter_reading_end', ro)
 
@@ -2509,3 +2518,386 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(contract.end_date, date(2030, 1, 2))
         # control: the UTC date at that instant is still 2030-01-01
         self.assertEqual(fixed_utc.date(), date(2030, 1, 1))
+
+    # ================================================================
+    # PHASE 22: FINANCIAL CONCURRENCY HARDENING (W1–W4)
+    # ================================================================
+    #
+    # NOTE (SQLite vs PostgreSQL): the test runner uses SQLite, where
+    # select_for_update() is a documented no-op (Django only emits FOR UPDATE
+    # when the backend supports it — see django/db/models/sql/compiler.py).
+    # The tests below prove state invariants, zero-write losing paths, and that
+    # the flows issue locked reads. True parallel lock contention must be
+    # verified on PostgreSQL before production sign-off.
+
+    def _spy_on_select_for_update(self, calls):
+        real = QuerySet.select_for_update
+
+        def spy(self, *args, **kwargs):
+            calls.append(self.model.__name__)
+            return real(self, *args, **kwargs)
+
+        return mock.patch.object(QuerySet, 'select_for_update', spy)
+
+    def test_w1_01_verify_payment_uses_locked_reads(self):
+        """W1: verify_payment locks Invoice then Payment via select_for_update."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        calls = []
+        with self._spy_on_select_for_update(calls):
+            resp = self.admin_ancol_client.post(
+                reverse('verify_payment', args=[payment.pk, 'approve'])
+            )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(calls[:2], ['Invoice', 'Payment'])
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+
+    def test_w1_02_second_reject_performs_zero_writes(self):
+        """W1: a losing second decision leaves all decision metadata untouched."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'First decision'},
+        )
+        payment.refresh_from_db()
+        invoice.refresh_from_db()
+        first_state = (
+            payment.status, payment.rejection_note, payment.verified_at,
+            invoice.status,
+        )
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'Second attempt should lose'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        payment.refresh_from_db()
+        invoice.refresh_from_db()
+        self.assertEqual(
+            (payment.status, payment.rejection_note, payment.verified_at, invoice.status),
+            first_state,
+        )
+
+    def test_w1_03_approve_after_reject_preserves_rejection_metadata(self):
+        """W1: approve attempt after reject cannot overwrite REJECTED evidence."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'Rejected with reason'},
+        )
+        payment.refresh_from_db()
+        note, verified_at = payment.rejection_note, payment.verified_at
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'approve'])
+        )
+        self.assertEqual(resp.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'REJECTED')
+        self.assertEqual(payment.rejection_note, note)
+        self.assertEqual(payment.verified_at, verified_at)
+
+    def test_w1_04_finalized_invoice_cannot_be_reverted(self):
+        """W1: a stale PENDING payment cannot revert a finalized invoice."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'stale attempt'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        self.assertEqual(payment.status, 'PENDING')
+
+    def test_w2_01_invoice_detail_electricity_uses_locked_read(self):
+        """W2: invoice_detail POST serializes on the invoice row."""
+        tenant, contract, invoice = self._setup_payment_data()
+        calls = []
+        with self._spy_on_select_for_update(calls):
+            resp = self.admin_ancol_client.post(
+                reverse('invoice_detail', args=[invoice.pk]),
+                {'meter_reading_start': 100, 'meter_reading_end': 150,
+                 'rate_per_kwh': '1500.00'},
+            )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(calls)
+        self.assertEqual(calls[0], 'Invoice')
+        self.assertNotIn('Payment', calls)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('75000.00'))
+
+    def test_w2_02_model_guard_blocks_write_on_lunas_invoice(self):
+        """W2: ElectricityReading.save() refuses writes once the invoice is LUNAS."""
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        invoice.refresh_from_db()  # fresh amounts before flipping status
+        invoice.status = 'LUNAS'
+        invoice.save()
+        reading.meter_reading_end = 999
+        with self.assertRaises(ValidationError):
+            reading.save()
+        reading.refresh_from_db()
+        invoice.refresh_from_db()
+        self.assertEqual(reading.meter_reading_end, 10)
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('15000.00'))
+
+    def test_w2_03_model_guard_blocks_creation_on_lunas_invoice(self):
+        """W2: no ElectricityReading can be created on a LUNAS invoice (model layer)."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        with self.assertRaises(ValidationError):
+            ElectricityReading.objects.create(
+                invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+                rate_per_kwh=Decimal('1500')
+            )
+        self.assertFalse(ElectricityReading.objects.filter(invoice=invoice).exists())
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('0'))
+
+    def test_w2_04_model_guard_allows_unpaid_writes(self):
+        """W2 regression: unpaid invoices still accept electricity writes."""
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        self.assertEqual(reading.calculated_amount, Decimal('15000.00'))
+
+    def test_w2_05_upload_confirmation_uses_locked_invoice(self):
+        """W2: public upload confirmation re-checks the invoice under a row lock."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        img = create_test_image('w2_confirm.jpg')
+        calls = []
+        with self._spy_on_select_for_update(calls):
+            resp = self.public_client.post(
+                reverse('public_payment_step2'),
+                {'payment_proof_file': img}, format='multipart'
+            )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(calls, ['Invoice'])
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'MENUNGGU_VERIFIKASI')
+        self.assertTrue(Payment.objects.filter(invoice=invoice).exists())
+
+    def test_w2_06_upload_confirmation_cannot_reopen_decided_invoice(self):
+        """W2: upload confirmation cannot reopen/flip a LUNAS invoice."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        img = create_test_image('w2_lunas.jpg')
+        resp = self.public_client.post(
+            reverse('public_payment_step2'),
+            {'payment_proof_file': img}, format='multipart'
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        self.assertFalse(Payment.objects.filter(invoice=invoice).exists())
+
+    def test_w2_07_model_save_uses_locked_fresh_invoice(self):
+        """W2: ElectricityReading.save() writes the locked fresh row, not the stale object."""
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        # Concurrent change behind the local stale object: a full-row stale write
+        # would resurrect the old due_date; the fresh-locked write must keep it.
+        Invoice.objects.filter(pk=invoice.pk).update(due_date=date(2031, 1, 1))
+        calls = []
+        with self._spy_on_select_for_update(calls):
+            reading.save()
+        self.assertIn('Invoice', calls)
+        invoice.refresh_from_db()
+        reading.refresh_from_db()
+        self.assertEqual(reading.calculated_amount, Decimal('15000.00'))
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('15000.00'))
+        self.assertEqual(invoice.due_date, date(2031, 1, 1))  # fresh row survived
+
+    def test_w2_08_upload_confirmation_rechecks_after_stale_prefetch(self):
+        """W2: a stale prefetch (invoice decided meanwhile) is caught by the locked re-check."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        img = create_test_image('w2_stale.jpg')
+        # Simulate the decided-meanwhile race shape: bypass the status exclusion so
+        # the view's prefetch still believes an active invoice exists.
+        with mock.patch.object(QuerySet, 'exclude', lambda self, *args, **kwargs: self):
+            resp = self.public_client.post(
+                reverse('public_payment_step2'),
+                {'payment_proof_file': img}, format='multipart'
+            )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        self.assertFalse(Payment.objects.filter(invoice=invoice).exists())
+        # Session preserved for a legitimate retry (no success path taken)
+        self.assertIn('verified_contract_id', self.public_client.session)
+
+    def test_w3_01_health_path_exempt_from_ssl_redirect(self):
+        """W3: /health/ skips the HTTPS redirect so the container check reaches the view."""
+        from django.middleware.security import SecurityMiddleware
+        self.assertIn(r'^health/$', settings.SECURE_REDIRECT_EXEMPT)
+        with override_settings(SECURE_SSL_REDIRECT=True, SECURE_REDIRECT_EXEMPT=[r'^health/$']):
+            middleware = SecurityMiddleware(lambda request: HttpResponse('ok'))
+            health_response = middleware(RequestFactory().get('/health/'))
+            other_response = middleware(RequestFactory().get('/invoice/'))
+        self.assertEqual(health_response.status_code, 200)
+        self.assertEqual(other_response.status_code, 301)
+
+    def test_w3_02_health_endpoint_checks_database(self):
+        """W3: /health/ actually executes the DB check and returns ok."""
+        resp = self.client.get('/health/')
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertEqual(payload.get('status'), 'ok')
+        self.assertEqual(payload.get('database'), 'connected')
+
+    def test_w4_01_audit_warns_lunas_without_approved_payment(self):
+        """W4: LUNAS invoice whose only payment is REJECTED gets a visible warning."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'not valid'},
+        )
+        invoice.refresh_from_db()
+        invoice.status = 'LUNAS'  # simulate paid without approved evidence
+        invoice.save()
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        text = out.getvalue()
+        self.assertIn('WARNINGS (non-blocking data-quality review):', text)
+        self.assertIn(f'invoice {invoice.pk}: LUNAS invoice without approved payment', text)
+        self.assertIn('No ambiguous rows detected', text)
+
+    def test_w4_02_audit_no_warning_when_approved_payment_exists(self):
+        """W4: LUNAS invoice with an APPROVED payment is not warned."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'approve'])
+        )
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        text = out.getvalue()
+        self.assertNotIn('without approved payment', text)
+
+    # ================================================================
+    # PHASE 23: FINAL-REVIEW ADMIN-SURFACE HARDENING (W5)
+    # ================================================================
+
+    def test_w2_09_model_guard_blocks_write_when_menunggu(self):
+        """W5: model guard covers MENUNGGU_VERIFIKASI, not only LUNAS."""
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        invoice.refresh_from_db()
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        reading.meter_reading_end = 999
+        with self.assertRaises(ValidationError):
+            reading.save()
+        reading.refresh_from_db()
+        invoice.refresh_from_db()
+        self.assertEqual(reading.meter_reading_end, 10)
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('15000.00'))
+
+    def test_w2_10_model_guard_blocks_creation_when_menunggu(self):
+        """W5: no reading creation while awaiting verification (model layer)."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        with self.assertRaises(ValidationError):
+            ElectricityReading.objects.create(
+                invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+                rate_per_kwh=Decimal('1500')
+            )
+        self.assertFalse(ElectricityReading.objects.filter(invoice=invoice).exists())
+
+    def test_w5_01_admin_invoice_menunggu_locks_financial_fields(self):
+        """W5: MENUNGGU invoice keeps amounts/contract/due-date read-only in admin."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import InvoiceAdmin
+        ma = InvoiceAdmin(Invoice, dj_admin.site)
+        tenant, contract, invoice, payment = self._setup_verification_data()  # MENUNGGU
+        ro = ma.get_readonly_fields(None, invoice)
+        for field in ('base_rent_amount', 'electricity_bill_amount', 'due_date',
+                      'contract', 'billing_period_start', 'status', 'total_amount'):
+            self.assertIn(field, ro)
+        invoice.status = 'BELUM_LUNAS'
+        invoice.save()
+        ro_open = ma.get_readonly_fields(None, invoice)
+        self.assertNotIn('base_rent_amount', ro_open)
+
+    def _admin_invoice_post_data(self, invoice):
+        return {
+            'contract': invoice.contract_id,
+            'billing_period_start': invoice.billing_period_start.isoformat(),
+            'due_date': invoice.due_date.isoformat(),
+            'base_rent_amount': str(invoice.base_rent_amount),
+            'electricity_bill_amount': str(invoice.electricity_bill_amount),
+            '_save': 'Save',
+        }
+
+    def test_w5_02_admin_cannot_edit_lunas_invoice(self):
+        """W5: admin save refuses edits on a LUNAS invoice (no unlock+save TOCTOU)."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        data = self._admin_invoice_post_data(invoice)
+        data['base_rent_amount'] = '9999999'
+        resp = self.superuser_client.post(
+            reverse('admin:finance_invoice_change', args=[invoice.pk]), data
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.base_rent_amount, Decimal('2000000.00'))
+        self.assertEqual(invoice.total_amount, Decimal('2000000.00'))
+
+    def test_w5_03_admin_edit_on_menunggu_restores_financial_values(self):
+        """W5: stale admin POST on a MENUNGGU invoice cannot change financial values."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        data = self._admin_invoice_post_data(invoice)
+        data['base_rent_amount'] = '9999999'
+        data['due_date'] = '2031-01-01'
+        resp = self.superuser_client.post(
+            reverse('admin:finance_invoice_change', args=[invoice.pk]), data
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.base_rent_amount, Decimal('2000000.00'))
+        self.assertEqual(invoice.due_date, date.today() + timedelta(days=10))
+        self.assertEqual(invoice.status, 'MENUNGGU_VERIFIKASI')
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('0'))
+
+    def test_w5_04_admin_electricity_readonly_when_menunggu(self):
+        """W5: ElectricityReading is fully read-only while its invoice awaits verification."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import ElectricityReadingAdmin
+        ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        invoice.refresh_from_db()
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        reading.refresh_from_db()
+        ro = ma.get_readonly_fields(None, reading)
+        self.assertIn('meter_reading_end', ro)

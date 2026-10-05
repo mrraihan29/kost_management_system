@@ -1,4 +1,5 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.db import transaction
 from .models import Invoice, ElectricityReading, Payment, OperationCost
 
 
@@ -12,12 +13,40 @@ class InvoiceAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    # W1b/BQ-5: status/derived key selalu read-only; invoice LUNAS sepenuhnya view-only
+    # W1b/BQ-5: status/derived key selalu read-only; invoice LUNAS sepenuhnya view-only;
+    # MENUNGGU_VERIFIKASI mengunci nilai finansial (kebijakan imutabilitas W2/W3)
     def get_readonly_fields(self, request, obj=None):
         protected = ('status', 'total_amount', 'billing_period_year', 'billing_period_month')
         if obj is not None and obj.status == 'LUNAS':
             return tuple(field.name for field in self.model._meta.fields)
+        if obj is not None and obj.status == 'MENUNGGU_VERIFIKASI':
+            return protected + (
+                'contract', 'billing_period_start', 'due_date',
+                'base_rent_amount', 'electricity_bill_amount',
+            )
         return protected
+
+    # W2 follow-up: serialize admin invoice edits on the invoice row so a stale admin POST
+    # cannot rewrite finalized/awaiting financial values (closes the unlock+save TOCTOU).
+    def save_model(self, request, obj, form, change):
+        with transaction.atomic():
+            if change and obj.pk:
+                locked = Invoice.objects.select_for_update().get(pk=obj.pk)
+                if locked.status == 'LUNAS':
+                    messages.error(request, 'Tagihan yang sudah LUNAS tidak dapat diubah.')
+                    return
+                if locked.status == 'MENUNGGU_VERIFIKASI':
+                    obj.status = locked.status
+                    obj.contract = locked.contract
+                    obj.billing_period_start = locked.billing_period_start
+                    obj.due_date = locked.due_date
+                    obj.base_rent_amount = locked.base_rent_amount
+                    obj.electricity_bill_amount = locked.electricity_bill_amount
+                    messages.error(
+                        request,
+                        'Nilai finansial tagihan yang menunggu verifikasi tidak diubah.',
+                    )
+            super().save_model(request, obj, form, change)
 
 
 class PaymentAdmin(admin.ModelAdmin):
@@ -48,7 +77,7 @@ class ElectricityReadingAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         protected = ('invoice',)
-        if obj is not None and obj.invoice.status == 'LUNAS':
+        if obj is not None and obj.invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
             return tuple(field.name for field in self.model._meta.fields)
         return protected
 
