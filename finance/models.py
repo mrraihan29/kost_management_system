@@ -33,17 +33,33 @@ class Invoice(models.Model):
 
     contract = models.ForeignKey(TenantContract, on_delete=models.CASCADE, related_name='invoices')
     billing_period_start = models.DateField(db_index=True)
-    due_date = models.DateField(help_text="Tanggal Jatuh Tempo (H-10)", db_index=True)
+    due_date = models.DateField(help_text="Jatuh tempo default: +10 hari dari tanggal tagihan", db_index=True)
     
     base_rent_amount = models.DecimalField(max_digits=12, decimal_places=2)
     electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS', db_index=True)
     
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, editable=False) 
+
+    # W4/BQ-6: periode tagihan ternormalisasi — sumber tunggal untuk idempotensi + constraint unik
+    billing_period_year = models.PositiveSmallIntegerField(editable=False)
+    billing_period_month = models.PositiveSmallIntegerField(editable=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['contract', 'billing_period_year', 'billing_period_month'],
+                name='uniq_invoice_contract_period',
+            )
+        ]
     
     def save(self, *args, **kwargs):
         # Selalu hitung ulang total saat save (A-DATA-01 fix)
         self.total_amount = self.base_rent_amount + self.electricity_bill_amount
+        # W4/BQ-6: turunkan periode ternormalisasi dari billing_period_start
+        if self.billing_period_start:
+            self.billing_period_year = self.billing_period_start.year
+            self.billing_period_month = self.billing_period_start.month
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -78,9 +94,17 @@ class ElectricityReading(models.Model):
         return f"Listrik Tagihan #{self.invoice.id}"
 
 class Payment(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Menunggu Keputusan'),
+        ('APPROVED', 'Disetujui'),
+        ('REJECTED', 'Ditolak'),
+    ]
+
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
     payment_proof_file = models.ImageField(upload_to=payment_proof_upload_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    # W1/BQ-8: keputusan verifikasi bersifat final per Payment (rejected tidak bisa di-approve ulang)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', db_index=True)
     
     # Siapa admin yang memverifikasi? (Sesuai ERD)
     verified_by = models.ForeignKey(

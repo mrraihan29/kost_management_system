@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from core.models import Room
-import random
+import secrets
 import string
 
 # Fungsi utilitas untuk merename file KTP agar unik (Security NFR-02)
@@ -93,8 +93,9 @@ class TenantContract(models.Model):
 
     def generate_unique_pin(self):
         # Loop sampai menemukan PIN yang belum dipakai (untuk hindari duplikat)
+        # W10/BQ-4: gunakan CSPRNG (secrets), bukan random
         while True:
-            new_pin = ''.join(random.choices(string.digits, k=6))
+            new_pin = ''.join(secrets.choice(string.digits) for _ in range(6))
             if not TenantContract.objects.filter(payment_pin=new_pin).exists():
                 return new_pin
 

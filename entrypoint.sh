@@ -10,5 +10,8 @@ set -e
 echo "=== Running database migrations ==="
 python manage.py migrate --noinput
 
+echo "=== Ensuring cache table (idempotent; no-op for non-DB caches) ==="
+python manage.py createcachetable
+
 echo "=== Starting application server ==="
 exec "$@"

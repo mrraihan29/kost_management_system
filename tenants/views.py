@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Prefetch
 from django.contrib import messages
@@ -106,11 +107,17 @@ class TenantUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     login_url = '/accounts/login/'
 
     def get_queryset(self):
-        """Security: Admin biasa hanya bisa edit tenant di lokasinya"""
+        """W9/BQ-7: admin biasa hanya bisa edit tenant dengan kontrak AKTIF di lokasinya.
+        Tenant historis (tanpa kontrak aktif) tetap terlihat di list, tapi read-only."""
         qs = super().get_queryset()
-        if not self.request.user.is_superuser:
-            if hasattr(self.request.user, 'admin_profile') and self.request.user.admin_profile.assigned_location:
-                qs = qs.filter(contracts__room__kost_location=self.request.user.admin_profile.assigned_location).distinct()
+        user = self.request.user
+        if not user.is_superuser:
+            if hasattr(user, 'admin_profile') and user.admin_profile.assigned_location:
+                location = user.admin_profile.assigned_location
+                qs = qs.filter(
+                    contracts__room__kost_location=location,
+                    contracts__is_active=True,
+                ).distinct()
             else:
                 qs = qs.none()
         return qs
@@ -154,8 +161,8 @@ def tenant_checkout(request, pk):
         
         # 1. Nonaktifkan Kontrak
         active_contract.is_active = False
-        # 2. Catat tanggal keluar (Hari ini)
-        active_contract.end_date = timezone.now().date()
+        # 2. Catat tanggal keluar (RC4: pakai localdate sesuai TIME_ZONE bisnis)
+        active_contract.end_date = timezone.localdate()
         active_contract.save()
 
         # SEC-12: Audit log checkout
@@ -228,11 +235,27 @@ class TenantContractCreateView(LoginRequiredMixin, StaffWithLocationRequiredMixi
         kwargs['user'] = self.request.user
         return kwargs
 
+    def get_tenant(self):
+        """RC2/BQ-7: scope tenant sebelum render/POST — 404 untuk tenant asing.
+
+        Visible: fresh (tanpa kontrak) atau punya riwayat/aktif di lokasi staff.
+        PG-1: pemindahan tenant yang hanya punya histori di lokasi lain diblokir
+        sampai product owner memutuskan siapa yang boleh memulai.
+        """
+        tenant = get_object_or_404(Tenant, pk=self.kwargs['pk'])
+        user = self.request.user
+        if not user.is_superuser:
+            location = user.admin_profile.assigned_location
+            has_contracts = tenant.contracts.exists()
+            has_own_history = tenant.contracts.filter(room__kost_location=location).exists()
+            if has_contracts and not has_own_history:
+                raise Http404("Tenant tidak ditemukan.")
+        return tenant
+
     def form_valid(self, form):
-        # Otomatis isi tenant berdasarkan URL (pk)
-        tenant_id = self.kwargs['pk']
-        tenant = get_object_or_404(Tenant, pk=tenant_id)
-        
+        # Otomatis isi tenant berdasarkan URL (pk) — scope dulu (RC2)
+        tenant = self.get_tenant()
+
         # B-FLOW-02 fix: Cegah double assignment
         if tenant.contracts.filter(is_active=True).exists():
             messages.error(self.request, f"{tenant.full_name} sudah memiliki kontrak aktif. Checkout dulu sebelum assign kamar baru.")
@@ -243,6 +266,5 @@ class TenantContractCreateView(LoginRequiredMixin, StaffWithLocationRequiredMixi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        tenant = get_object_or_404(Tenant, pk=self.kwargs['pk'])
-        context['tenant'] = tenant
+        context['tenant'] = self.get_tenant()  # RC2: authorize BEFORE rendering
         return context

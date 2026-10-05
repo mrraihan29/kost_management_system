@@ -8,6 +8,7 @@ from .services import sync_overdue_invoice_statuses
 from config.security import check_rate_limit, record_failed_attempt, reset_rate_limit, log_action
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.db import IntegrityError
 from django.db.models import Q, Sum, Count
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, HttpResponseForbidden
@@ -196,11 +197,17 @@ def verify_payment(request, payment_id, action):
         return redirect('dashboard')
 
     if action == 'approve':
+        # W1/BQ-8: hanya Payment PENDING pada invoice MENUNGGU_VERIFIKASI yang bisa diputuskan
+        if payment.status != 'PENDING' or invoice.status != 'MENUNGGU_VERIFIKASI':
+            messages.error(request, "Pembayaran ini tidak dapat diproses (status tidak sesuai).")
+            return redirect('dashboard')
+
         # Update Invoice jadi LUNAS
         invoice.status = 'LUNAS'
         invoice.save()
 
         # Update Payment Info
+        payment.status = 'APPROVED'
         payment.verified_by = request.user
         payment.verified_at = timezone.now()
         payment.save()
@@ -213,6 +220,11 @@ def verify_payment(request, payment_id, action):
         messages.success(request, f"Pembayaran {invoice.contract.tenant.full_name} disetujui.")
 
     elif action == 'reject':
+        # W1/BQ-8: rejected bersifat final; guard sama dengan approve
+        if payment.status != 'PENDING' or invoice.status != 'MENUNGGU_VERIFIKASI':
+            messages.error(request, "Pembayaran ini tidak dapat diproses (status tidak sesuai).")
+            return redirect('dashboard')
+
         # F-02 fix: Kembalikan status berdasarkan apakah sudah lewat jatuh tempo
         today = timezone.now().date()
         if invoice.due_date < today:
@@ -222,6 +234,7 @@ def verify_payment(request, payment_id, action):
         invoice.save()
 
         # Update Payment Info (B-FLOW-03 fix: Custom rejection note)
+        payment.status = 'REJECTED'
         payment.verified_by = request.user
         payment.verified_at = timezone.now()
         custom_note = request.POST.get('rejection_note', '').strip()
@@ -308,6 +321,13 @@ def invoice_detail(request, pk):
 
     # Handle Form Listrik
     if request.method == 'POST':
+        # W3/BQ-5: paid or awaiting-verification invoices are financially immutable
+        if invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
+            messages.error(request, "Nilai tagihan ini tidak dapat diubah karena sudah dibayar atau menunggu verifikasi.")
+            return redirect('invoice_detail', pk=pk)
+        if invoice.contract.room.is_token_electricity:
+            messages.error(request, "Kamar ini menggunakan token; input meteran tidak diperlukan.")
+            return redirect('invoice_detail', pk=pk)
         if electricity:
             form = ElectricityForm(request.POST, instance=electricity)
         else:
@@ -378,6 +398,15 @@ def operation_create(request):
     """
     Form Tambah Biaya Baru
     """
+    # W8: hanya superuser atau staff dengan lokasi yang boleh mencatat pengeluaran
+    if not request.user.is_superuser:
+        if not request.user.is_staff:
+            messages.error(request, "Akses ditolak. Hanya admin/staff yang dapat mencatat pengeluaran.")
+            return redirect('dashboard')
+        if not (hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location):
+            messages.error(request, "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun.")
+            return redirect('dashboard')
+
     if request.method == 'POST':
         form = OperationCostForm(request.POST, request.FILES)
         if form.is_valid():
@@ -479,7 +508,7 @@ def print_receipt(request, pk):
 
     context = {
         'invoice': invoice,
-        'payment': invoice.payments.last(), # Ambil pembayaran terakhir yang sukses
+        'payment': invoice.payments.filter(status='APPROVED').order_by('verified_at', 'id').last(), # W1: hanya pembayaran yang disetujui
         'admin_name': request.user.get_full_name() or request.user.username,
         'print_date': timezone.now()
     }
@@ -682,13 +711,20 @@ def finance_report(request):
     location_label = "Semua Lokasi"
     
     if not request.user.is_superuser:
-        # Jika Admin biasa, paksa filter ke lokasinya
-        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+        # W2/BQ-10: fail closed — hanya staff dengan assigned_location yang boleh lihat laporan
+        if (
+            request.user.is_staff
+            and hasattr(request.user, 'admin_profile')
+            and request.user.admin_profile.assigned_location
+        ):
             user_loc = request.user.admin_profile.assigned_location
             invoices = invoices.filter(contract__room__kost_location=user_loc)
             costs = costs.filter(kost_location=user_loc)
             location_label = user_loc.name
             # Hide field lokasi di form nanti via template logic
+        else:
+            messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
+            return redirect('dashboard')
     elif selected_location:
         # Jika Superuser memilih lokasi tertentu
         invoices = invoices.filter(contract__room__kost_location=selected_location)
@@ -767,10 +803,18 @@ def export_finance_excel(request):
     ).select_related('kost_location', 'admin')
     
     if not request.user.is_superuser:
-        if hasattr(request.user, 'admin_profile') and request.user.admin_profile.assigned_location:
+        # W2/BQ-10: fail closed untuk non-staff / staff tanpa lokasi
+        if (
+            request.user.is_staff
+            and hasattr(request.user, 'admin_profile')
+            and request.user.admin_profile.assigned_location
+        ):
             loc = request.user.admin_profile.assigned_location
             invoices = invoices.filter(contract__room__kost_location=loc)
             costs = costs.filter(kost_location=loc)
+        else:
+            messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
+            return redirect('dashboard')
     elif loc_id:
         invoices = invoices.filter(contract__room__kost_location_id=loc_id)
         costs = costs.filter(kost_location_id=loc_id)
@@ -785,7 +829,7 @@ def export_finance_excel(request):
     
     # Header Style
     font_bold = Font(bold=True)
-    headers = ['Bulan', 'Pemasukan', 'Pengeluaran', 'Profit Bersih']
+    headers = ['Bulan', 'Pemasukan (Periode Tagihan)', 'Pengeluaran', 'Profit Bersih']
     ws1.append(headers)
     for cell in ws1[1]: cell.font = font_bold
 
@@ -804,7 +848,13 @@ def export_finance_excel(request):
     
     for inv in invoices.order_by('billing_period_start'):
         # Ambil admin yang verifikasi pembayaran terakhir
-        verifier = inv.payments.last().verified_by.username if inv.payments.exists() and inv.payments.last().verified_by else "-"
+        approved_payments = [p for p in inv.payments.all() if p.status == 'APPROVED']
+        latest_approved = max(
+            approved_payments,
+            key=lambda p: (p.verified_at or p.uploaded_at, p.id),
+            default=None,
+        )
+        verifier = latest_approved.verified_by.username if latest_approved and latest_approved.verified_by else "-"
         ws2.append([
             inv.billing_period_start,
             inv.contract.tenant.full_name,
@@ -872,31 +922,36 @@ def generate_invoices_bulk(request):
                 except ValueError:
                     # Fallback untuk tanggal 29/30/31 di bulan pendek
                     billing_start = billing_start_base.replace(day=28)
-                due_date = billing_start
+                # W5/BQ-1: jatuh tempo = tanggal tagihan + 10 hari
+                due_date = billing_start + relativedelta(days=10)
             else:
                 # NON-ANCOL: serentak mengikuti tanggal global sistem (start bulan)
                 billing_start = billing_start_base
                 # Ketentuan existing: jatuh tempo H+10 dari tanggal muncul tagihan
                 due_date = billing_start + relativedelta(days=10)
 
-            # A-01 fix: Cek by month/year (konsisten dengan management command)
+            # W4/BQ-6: cek periode ternormalisasi (sumber tunggal dengan constraint unik)
             exists = Invoice.objects.filter(
                 contract=contract,
-                billing_period_start__month=billing_start.month,
-                billing_period_start__year=billing_start.year
+                billing_period_year=billing_start.year,
+                billing_period_month=billing_start.month
             ).exists()
 
             if not exists:
-                Invoice.objects.create(
-                    contract=contract,
-                    billing_period_start=billing_start,
-                    due_date=due_date,
-                    base_rent_amount=contract.monthly_rent_amount,
-                    electricity_bill_amount=0,
-                    total_amount=contract.monthly_rent_amount,
-                    status='BELUM_LUNAS'
-                )
-                created_count += 1
+                try:
+                    Invoice.objects.create(
+                        contract=contract,
+                        billing_period_start=billing_start,
+                        due_date=due_date,
+                        base_rent_amount=contract.monthly_rent_amount,
+                        electricity_bill_amount=0,
+                        total_amount=contract.monthly_rent_amount,
+                        status='BELUM_LUNAS'
+                    )
+                    created_count += 1
+                except IntegrityError:
+                    # Race: invoice periode ini dibuat proses lain bersamaan
+                    skipped_count += 1
             else:
                 skipped_count += 1
 

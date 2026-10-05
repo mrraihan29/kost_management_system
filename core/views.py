@@ -120,6 +120,8 @@ def admin_dashboard(request):
         status__in=['MENUNGGU_VERIFIKASI', 'TELAT_BAYAR']
     ).select_related(
         'contract__tenant', 'contract__room__kost_location'
+    ).prefetch_related(
+        Prefetch('payments', queryset=Payment.objects.filter(status='PENDING'), to_attr='pending_payments')
     ).order_by('status', 'due_date')
 
     try:
@@ -313,6 +315,11 @@ def room_delete(request, pk):
     # Cek apakah kamar sedang ditempati
     if room.contracts.filter(is_active=True).exists():
         messages.error(request, f"Kamar {room.room_number} tidak bisa dihapus karena masih ada penghuni aktif.")
+        return redirect('room_list')
+
+    # W11b/BQ-9: histori kontrak (termasuk yang sudah tidak aktif) juga melindungi kamar
+    if room.contracts.exists():
+        messages.error(request, f"Kamar {room.room_number} tidak bisa dihapus karena memiliki riwayat kontrak.")
         return redirect('room_list')
     
     room_number = room.room_number

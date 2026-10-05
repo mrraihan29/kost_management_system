@@ -23,16 +23,17 @@ security_logger = logging.getLogger('security')
 
 def get_client_ip(request):
     """
-    Ambil IP address klien dengan mempertimbangkan proxy/load balancer.
-    Mendukung header X-Forwarded-For (Cloudflare, Nginx, dll).
+    Ambil IP address klien.
+    W7: X-Forwarded-For hanya dipercaya bila settings.TRUST_X_FORWARDED_FOR=True
+    (deployment di belakang reverse proxy yang sudah terverifikasi).
+    Default: REMOTE_ADDR — mencegah bypass rate limit via header spoofing.
     """
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        # Ambil IP pertama (client asli) dari chain
-        ip = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR', '0.0.0.0')
-    return ip
+    if getattr(settings, 'TRUST_X_FORWARDED_FOR', False):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            # Ambil IP pertama (client asli) dari chain
+            return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '0.0.0.0')
 
 
 def check_rate_limit(request, key_prefix='pin_attempt', max_attempts=5, window=900):

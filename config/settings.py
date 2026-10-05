@@ -48,6 +48,10 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(','
 _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.web.id,https://*.coolify.io')
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
+# W7: X-Forwarded-For hanya dipercaya bila deployment berada di belakang
+# reverse proxy terpercaya. Default False = pakai REMOTE_ADDR (anti-spoof).
+TRUST_X_FORWARDED_FOR = os.environ.get('TRUST_X_FORWARDED_FOR', 'False').lower() in ('true', '1', 'yes')
+
 
 # ──────────────────────────────────────────────
 # Application definition

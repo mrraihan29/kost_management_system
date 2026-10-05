@@ -12,9 +12,10 @@ Run: python manage.py test tests_simulation --verbosity=2
 
 import os
 import io
+import calendar
 import tempfile
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
@@ -22,6 +23,8 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError
 
 from core.models import KostLocation, Room
 from users.models import AdminProfile
@@ -723,8 +726,8 @@ class FullBusinessProcessTest(TestCase):
         self.admin_ancol_client.post(reverse('invoice_generate_bulk'))
         invoice = Invoice.objects.filter(contract=contract).first()
         self.assertIsNotNone(invoice)
-        # Due date should equal billing_period_start for Ancol
-        self.assertEqual(invoice.due_date, invoice.billing_period_start)
+        # W5/BQ-1: due date = billing period start + 10 days (Ancol included)
+        self.assertEqual(invoice.due_date, invoice.billing_period_start + timedelta(days=10))
 
     def test_phase6_12_non_ancol_billing_rule(self):
         """Business Rule B1: Non-Ancol billing uses fixed day 1 + 10 days."""
@@ -1682,7 +1685,8 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(resp.status_code, 302)
         contract.refresh_from_db()
         self.assertFalse(contract.is_active)
-        self.assertEqual(contract.end_date, date.today())
+        # RC4: checkout menulis tanggal bisnis (timezone.localdate), bukan tanggal host
+        self.assertEqual(contract.end_date, timezone.localdate())
 
         # 10. Delete tenant
         resp = self.superuser_client.post(
@@ -1690,3 +1694,818 @@ class FullBusinessProcessTest(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(Tenant.objects.filter(pk=tenant.pk).exists())
+
+    # ================================================================
+    # PHASE 16: P0/P1 REMEDIATION — PHASE A1 (W2, W3, W8, W12, W13)
+    # ================================================================
+
+    def _staff_without_location_client(self):
+        """Helper: staff user whose AdminProfile has no assigned location."""
+        user = User.objects.create_user(
+            username='staff_noloc', password='noloc123', is_staff=True
+        )
+        AdminProfile.objects.create(user=user, assigned_location=None)
+        client = Client()
+        client.login(username='staff_noloc', password='noloc123')
+        return client, user
+
+    # --- W2: report/export fail-closed ---
+
+    def test_phase11_05_finance_report_staff_without_location_denied(self):
+        """W2: staff without assigned_location cannot access financial report."""
+        client, _ = self._staff_without_location_client()
+        resp = client.get(reverse('finance_report'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_phase11_06_finance_report_non_staff_denied(self):
+        """W2: non-staff authenticated user cannot access financial report."""
+        resp = self.plain_user_client.get(reverse('finance_report'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_phase11_07_export_excel_staff_without_location_denied(self):
+        """W2: staff without assigned_location cannot export financial Excel."""
+        client, _ = self._staff_without_location_client()
+        resp = client.get(reverse('export_finance_excel'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_phase11_08_export_excel_non_staff_denied(self):
+        """W2: non-staff authenticated user cannot export financial Excel."""
+        resp = self.plain_user_client.get(reverse('export_finance_excel'))
+        self.assertEqual(resp.status_code, 302)
+
+    # --- W8: operation_create authorization ---
+
+    def test_phase10_08_operation_create_plain_user_denied(self):
+        """W8: non-staff user cannot create operational costs."""
+        img = create_test_image('w8_plain.jpg')
+        resp = self.plain_user_client.post(reverse('operation_add'), {
+            'kost_location': self.loc_ancol.pk,
+            'category': 'LAINNYA',
+            'amount': '10000',
+            'incurred_date': date.today().isoformat(),
+            'description': 'Should be denied',
+            'proof_file': img,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(OperationCost.objects.count(), 0)
+
+    def test_phase10_09_operation_create_staff_no_location_denied(self):
+        """W8: staff without assigned_location cannot create operational costs."""
+        client, _ = self._staff_without_location_client()
+        img = create_test_image('w8_noloc.jpg')
+        resp = client.post(reverse('operation_add'), {
+            'kost_location': self.loc_ancol.pk,
+            'category': 'LAINNYA',
+            'amount': '10000',
+            'incurred_date': date.today().isoformat(),
+            'description': 'Should be denied',
+            'proof_file': img,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(OperationCost.objects.count(), 0)
+
+    def test_phase10_10_operation_create_forces_own_location(self):
+        """W8: posted foreign location is overwritten with the staff's location."""
+        img = create_test_image('w8_force.jpg')
+        resp = self.admin_ancol_client.post(reverse('operation_add'), {
+            'kost_location': self.loc_kana.pk,  # wrong on purpose
+            'category': 'INTERNET',
+            'amount': '123000',
+            'incurred_date': date.today().isoformat(),
+            'description': 'Forced location check',
+            'proof_file': img,
+        })
+        self.assertEqual(resp.status_code, 302)
+        cost = OperationCost.objects.get(category='INTERNET')
+        self.assertEqual(cost.kost_location, self.loc_ancol)
+
+    # --- W3: electricity immutability ---
+
+    def test_phase6_13_electricity_edit_blocked_after_lunas(self):
+        """W3: LUNAS invoice electricity reading cannot be edited."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        resp = self.admin_ancol_client.post(
+            reverse('invoice_detail', args=[invoice.pk]),
+            {'meter_reading_start': 0, 'meter_reading_end': 100, 'rate_per_kwh': '1500.00'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        reading.refresh_from_db()
+        self.assertEqual(reading.meter_reading_end, 10)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.electricity_bill_amount, Decimal('15000.00'))
+
+    def test_phase6_14_electricity_create_blocked_after_lunas(self):
+        """W3: no new electricity reading can be created on a LUNAS invoice."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        resp = self.admin_ancol_client.post(
+            reverse('invoice_detail', args=[invoice.pk]),
+            {'meter_reading_start': 0, 'meter_reading_end': 100, 'rate_per_kwh': '1500.00'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(ElectricityReading.objects.filter(invoice=invoice).exists())
+
+    def test_phase6_15_electricity_edit_blocked_when_menunggu_verifikasi(self):
+        """W3: reading cannot change while payment is awaiting verification."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        resp = self.admin_ancol_client.post(
+            reverse('invoice_detail', args=[invoice.pk]),
+            {'meter_reading_start': 0, 'meter_reading_end': 100, 'rate_per_kwh': '1500.00'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(ElectricityReading.objects.filter(invoice=invoice).exists())
+
+    def test_phase6_16_electricity_edit_allowed_when_unpaid(self):
+        """W3 regression: TELAT_BAYAR (unpaid) invoices still accept readings."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'TELAT_BAYAR'
+        invoice.save()
+        resp = self.admin_ancol_client.post(
+            reverse('invoice_detail', args=[invoice.pk]),
+            {'meter_reading_start': 100, 'meter_reading_end': 150, 'rate_per_kwh': '1500.00'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        reading = ElectricityReading.objects.get(invoice=invoice)
+        self.assertEqual(reading.calculated_amount, Decimal('75000.00'))
+
+    # --- W12: upload copy/rules ---
+
+    def test_phase7_10_upload_pdf_rejected(self):
+        """W12/BQ-12: PDF payment proofs are rejected."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        proof = SimpleUploadedFile('proof.pdf', b'%PDF-1.4 fake', content_type='application/pdf')
+        resp = self.public_client.post(
+            reverse('public_payment_step2'), {'payment_proof_file': proof}, format='multipart'
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Payment.objects.filter(invoice=invoice).exists())
+
+    def test_phase7_11_upload_oversized_rejected(self):
+        """W12/BQ-12: files over 5 MB are rejected."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        big = SimpleUploadedFile('big.jpg', b'x' * (5 * 1024 * 1024 + 1), content_type='image/jpeg')
+        resp = self.public_client.post(
+            reverse('public_payment_step2'), {'payment_proof_file': big}, format='multipart'
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Payment.objects.filter(invoice=invoice).exists())
+
+    def test_phase7_12_upload_non_image_rejected(self):
+        """W12/BQ-12: non-image extensions are rejected."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        bad = SimpleUploadedFile('proof.html', b'<html></html>', content_type='text/html')
+        resp = self.public_client.post(
+            reverse('public_payment_step2'), {'payment_proof_file': bad}, format='multipart'
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Payment.objects.filter(invoice=invoice).exists())
+
+    def test_phase7_13_step2_template_copy_matches_rules(self):
+        """W12/BQ-12: upload page text reflects image-only 5 MB rule."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        resp = self.public_client.get(reverse('public_payment_step2'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'JPG/JPEG/PNG/WEBP. Maks 5 MB.')
+        self.assertNotContains(resp, 'PDF')
+        self.assertNotContains(resp, '2MB')
+
+    # --- W13: income labels ---
+
+    def test_phase5_05_dashboard_income_label_cash(self):
+        """W13/BQ-3: dashboard income KPI is labelled as cash basis."""
+        resp = self.admin_ancol_client.get(reverse('dashboard'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Pemasukan Bulan Ini (Kas)')
+
+    def test_phase11_09_report_income_label_accrual(self):
+        """W13/BQ-3: report income KPI is labelled as billing-period basis."""
+        resp = self.admin_ancol_client.get(reverse('finance_report'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Pemasukan (Periode Tagihan)')
+
+    # ================================================================
+    # PHASE 17: P0/P1 REMEDIATION — PHASE A2 (W1, W1b)
+    # ================================================================
+
+    def test_phase8_08_approve_requires_menunggu_invoice(self):
+        """W1: approve is blocked when the invoice is not MENUNGGU_VERIFIKASI."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        invoice.status = 'BELUM_LUNAS'
+        invoice.save()
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'approve'])
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'BELUM_LUNAS')
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'PENDING')
+
+    def test_phase8_09_double_approve_blocked(self):
+        """W1: a second approve does not rewrite the decision metadata."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'approve']))
+        payment.refresh_from_db()
+        first_verified_at = payment.verified_at
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'approve'])
+        )
+        self.assertEqual(resp.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'APPROVED')
+        self.assertEqual(payment.verified_at, first_verified_at)
+
+    def test_phase8_10_rejected_payment_never_reapprovable(self):
+        """W1/BQ-8: a rejected Payment can never be approved afterwards."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'reject']),
+                                     {'rejection_note': 'Not valid'})
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'REJECTED')
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'approve'])
+        )
+        self.assertEqual(resp.status_code, 302)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'REJECTED')
+        invoice.refresh_from_db()
+        self.assertNotEqual(invoice.status, 'LUNAS')
+
+    def test_phase8_11_reject_after_approve_blocked(self):
+        """W1: an approved Payment cannot be rejected afterwards."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'approve']))
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'Too late'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'APPROVED')
+
+    def test_phase8_12_reject_cannot_flip_lunas_via_old_pending_payment(self):
+        """W1/B1: rejecting an old PENDING payment cannot revert a LUNAS invoice."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        invoice.status = 'LUNAS'
+        invoice.save()  # invoice paid via another (approved) payment
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'Stale attempt'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'PENDING')
+
+    def test_phase8_13_dashboard_hides_actions_for_rejected_payment(self):
+        """W1: dashboard offers no verify actions for non-MENUNGGU invoices."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'reject']),
+                                     {'rejection_note': 'Bad proof'})
+        invoice.refresh_from_db()
+        invoice.status = 'TELAT_BAYAR'
+        invoice.save()
+        resp = self.admin_ancol_client.get(reverse('dashboard'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, '/verify/')
+
+    def test_phase8_14_retry_creates_new_payment_preserving_history(self):
+        """W1/BQ-8: a retry is a NEW Payment; the rejected row stays as history."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'reject']),
+                                     {'rejection_note': 'First attempt rejected'})
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'REJECTED')
+        # Tenant retries: new Payment row + invoice back to MENUNGGU (portal flow)
+        retry = Payment.objects.create(invoice=invoice, payment_proof_file='payment_proofs/retry.jpg')
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[retry.pk, 'approve']))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, 'LUNAS')
+        payment.refresh_from_db()
+        retry.refresh_from_db()
+        self.assertEqual(payment.status, 'REJECTED')
+        self.assertIn('First attempt rejected', payment.rejection_note)
+        self.assertEqual(retry.status, 'APPROVED')
+
+    def test_phase8_15_receipt_and_export_use_approved_payment(self):
+        """W1: receipt context and export verifier use the APPROVED payment."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        self.admin_ancol_client.post(reverse('verify_payment', args=[payment.pk, 'approve']))
+        payment.refresh_from_db()
+        stale = Payment.objects.create(
+            invoice=invoice, payment_proof_file='payment_proofs/stale.jpg', status='REJECTED'
+        )
+        resp = self.admin_ancol_client.get(reverse('print_receipt', args=[invoice.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['payment'].pk, payment.pk)
+        # Export: verifier column must show the approved payment's verifier
+        resp = self.admin_ancol_client.get(
+            reverse('export_finance_excel') + f'?year={date.today().year}'
+        )
+        self.assertEqual(resp.status_code, 200)
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(resp.content))
+        ws2 = wb['Rincian Pemasukan']
+        verifiers = [row[4] for row in ws2.iter_rows(min_row=2, values_only=True)]
+        self.assertIn('admin_ancol', verifiers)
+        self.assertNotEqual(stale.pk, payment.pk)
+
+    def test_phase16_01_audit_payment_history_clean(self):
+        """W1: audit command classifies a clean pending payment set."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        text = out.getvalue()
+        self.assertIn('pending=1', text)
+        self.assertIn('No ambiguous rows detected', text)
+
+    def test_phase16_01b_audit_lunas_without_payment_is_warning_only(self):
+        """W1: invoice-level anomaly is a non-blocking warning, not ambiguity."""
+        tenant, contract, invoice = self._setup_payment_data()
+        invoice.status = 'LUNAS'
+        invoice.save()
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        text = out.getvalue()
+        self.assertIn('No ambiguous rows detected', text)
+        self.assertIn('WARNINGS (non-blocking data-quality review):', text)
+        self.assertIn(f'invoice {invoice.pk}', text)
+
+    def test_phase16_02_audit_detects_verified_without_lunas(self):
+        """W1: audit flags verified_at payments whose invoice is not LUNAS."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        Payment.objects.filter(pk=payment.pk).update(verified_at=timezone.now())
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        text = out.getvalue()
+        self.assertIn('AMBIGUOUS', text)
+        self.assertIn(f'{payment.pk}', text)
+
+    def test_phase16_03_audit_detects_multiple_approved(self):
+        """W1: audit flags invoices with more than one approved-classified payment."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        Payment.objects.filter(pk=payment.pk).update(verified_at=timezone.now())
+        invoice.status = 'LUNAS'
+        invoice.save()
+        second = Payment.objects.create(invoice=invoice, payment_proof_file='payment_proofs/second.jpg')
+        Payment.objects.filter(pk=second.pk).update(verified_at=timezone.now())
+        out = io.StringIO()
+        call_command('audit_payment_history', stdout=out)
+        self.assertIn('multiple approved-classified payments (2)', out.getvalue())
+
+    def test_phase16_04_admin_payment_is_readonly_evidence(self):
+        """W1b: PaymentAdmin is evidence-only (no add/delete, all fields read-only)."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import PaymentAdmin
+        ma = PaymentAdmin(Payment, dj_admin.site)
+        self.assertFalse(ma.has_add_permission(None))
+        self.assertFalse(ma.has_delete_permission(None))
+        ro = ma.get_readonly_fields(None)
+        for field in ('invoice', 'payment_proof_file', 'uploaded_at', 'status',
+                      'verified_by', 'verified_at', 'rejection_note'):
+            self.assertIn(field, ro)
+
+    def test_phase16_05_admin_invoice_lunas_is_view_only(self):
+        """W1b: LUNAS invoices are fully read-only in admin; no delete ever."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import InvoiceAdmin
+        ma = InvoiceAdmin(Invoice, dj_admin.site)
+        self.assertFalse(ma.has_delete_permission(None))
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        ro_open = ma.get_readonly_fields(None, invoice)
+        self.assertIn('status', ro_open)
+        self.assertIn('total_amount', ro_open)
+        self.assertIn('billing_period_year', ro_open)
+        self.assertIn('billing_period_month', ro_open)
+        self.assertNotIn('base_rent_amount', ro_open)
+        invoice.status = 'LUNAS'
+        invoice.save()
+        ro_lunas = ma.get_readonly_fields(None, invoice)
+        self.assertIn('base_rent_amount', ro_lunas)
+        self.assertIn('electricity_bill_amount', ro_lunas)
+        self.assertIn('contract', ro_lunas)
+
+    def test_phase16_06_admin_electricity_reading_readonly_after_lunas(self):
+        """W1b: ElectricityReadingAdmin is append-less/delete-less and locked after LUNAS."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import ElectricityReadingAdmin
+        ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
+        self.assertFalse(ma.has_add_permission(None))
+        self.assertFalse(ma.has_delete_permission(None))
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        self.assertEqual(ma.get_readonly_fields(None, reading), ('invoice',))
+        invoice.status = 'LUNAS'
+        invoice.save()
+        ro = ma.get_readonly_fields(None, reading)
+        self.assertIn('meter_reading_end', ro)
+
+    # ================================================================
+    # PHASE 18: P0/P1 REMEDIATION — PHASE A3 (W4, W5, W10)
+    # ================================================================
+
+    def test_phase6_17_ancol_command_due_is_start_plus_10(self):
+        """W5/BQ-1: management command applies the same Ancol due-date rule."""
+        tenant, contract = self._setup_billing_data()
+        call_command('generate_monthly_invoices')
+        invoice = Invoice.objects.filter(contract=contract).first()
+        self.assertIsNotNone(invoice)
+        self.assertEqual(invoice.due_date, invoice.billing_period_start + timedelta(days=10))
+
+    def test_phase6_18_ancol_start_day_clamped_with_plus_10(self):
+        """RC3/W5: day 29-31 clamps only when the target billing month lacks it."""
+        tenant_clamped = Tenant.objects.create(
+            full_name='Clamp Tenant', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract_clamped = TenantContract.objects.create(
+            tenant=tenant_clamped, room=self.rooms['A-103'],
+            start_date=date(2026, 1, 31),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        tenant_plain = Tenant.objects.create(
+            full_name='Plain Day Tenant', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract_plain = TenantContract.objects.create(
+            tenant=tenant_plain, room=self.rooms['A-102'],
+            start_date=date(2026, 1, 15),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self.admin_ancol_client.post(reverse('invoice_generate_bulk'))
+        invoice_clamped = Invoice.objects.filter(contract=contract_clamped).first()
+        invoice_plain = Invoice.objects.filter(contract=contract_plain).first()
+        self.assertIsNotNone(invoice_clamped)
+        self.assertIsNotNone(invoice_plain)
+        start = invoice_clamped.billing_period_start
+        days_in_month = calendar.monthrange(start.year, start.month)[1]
+        expected_day = 31 if days_in_month >= 31 else 28
+        self.assertEqual(start.day, expected_day)
+        self.assertEqual(invoice_clamped.due_date, start + timedelta(days=10))
+        self.assertEqual(invoice_plain.billing_period_start.day, 15)
+        self.assertEqual(
+            invoice_plain.due_date,
+            invoice_plain.billing_period_start + timedelta(days=10),
+        )
+
+    def test_phase6_19_duplicate_invoice_period_rejected(self):
+        """W4/BQ-6: DB constraint blocks a second invoice for the same period."""
+        tenant, contract = self._setup_billing_data()
+        Invoice.objects.create(
+            contract=contract, billing_period_start=date.today().replace(day=1),
+            due_date=date.today().replace(day=11),
+            base_rent_amount=Decimal('1500000'), electricity_bill_amount=0,
+            status='BELUM_LUNAS'
+        )
+        with self.assertRaises(IntegrityError):
+            Invoice.objects.create(
+                contract=contract, billing_period_start=date.today().replace(day=15),
+                due_date=date.today().replace(day=25),
+                base_rent_amount=Decimal('1500000'), electricity_bill_amount=0,
+                status='BELUM_LUNAS'
+            )
+
+    def test_phase6_20_bulk_generate_exactly_one_per_period(self):
+        """W4/BQ-6: repeated generation yields exactly one invoice per period."""
+        tenant, contract = self._setup_billing_data()
+        self.admin_ancol_client.post(reverse('invoice_generate_bulk'))
+        self.admin_ancol_client.post(reverse('invoice_generate_bulk'))
+        self.assertEqual(Invoice.objects.filter(contract=contract).count(), 1)
+
+    def test_phase6_21_audit_duplicate_invoices_clean(self):
+        """W4: audit command reports a clean dataset (constraint prevents dupes)."""
+        tenant, contract = self._setup_billing_data()
+        call_command('generate_monthly_invoices')
+        out = io.StringIO()
+        call_command('audit_duplicate_invoices', stdout=out)
+        self.assertIn('no duplicates found', out.getvalue())
+
+    def test_phase6_22_normalized_period_fields_backfilled(self):
+        """W4: billing period fields derive from billing_period_start on save."""
+        tenant, contract = self._setup_billing_data()
+        start = date(2026, 3, 7)
+        invoice = Invoice.objects.create(
+            contract=contract, billing_period_start=start,
+            due_date=date(2026, 3, 17),
+            base_rent_amount=Decimal('1500000'), electricity_bill_amount=0,
+            status='BELUM_LUNAS'
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.billing_period_year, 2026)
+        self.assertEqual(invoice.billing_period_month, 3)
+
+    def test_phase4_10_new_contracts_get_distinct_pins(self):
+        """W10/BQ-4: new contracts receive distinct CSPRNG PINs."""
+        tenant1 = Tenant.objects.create(full_name='Pin One', phone_number='081', emergency_contact_phone='082')
+        tenant2 = Tenant.objects.create(full_name='Pin Two', phone_number='081', emergency_contact_phone='082')
+        contract1 = TenantContract.objects.create(
+            tenant=tenant1, room=self.rooms['A-101'],
+            start_date=date.today(), monthly_rent_amount=Decimal('1000000')
+        )
+        contract2 = TenantContract.objects.create(
+            tenant=tenant2, room=self.rooms['A-102'],
+            start_date=date.today(), monthly_rent_amount=Decimal('1000000')
+        )
+        self.assertNotEqual(contract1.payment_pin, contract2.payment_pin)
+        for contract in (contract1, contract2):
+            self.assertEqual(len(contract.payment_pin), 6)
+            self.assertTrue(contract.payment_pin.isdigit())
+
+    def test_phase4_11_pin_not_rotated_on_update(self):
+        """W10/BQ-4: updating an active contract does not rotate its PIN."""
+        tenant, contract = self._setup_billing_data()
+        original_pin = contract.payment_pin
+        contract.monthly_rent_amount = Decimal('1600000')
+        contract.save()
+        contract.refresh_from_db()
+        self.assertEqual(contract.payment_pin, original_pin)
+
+    # ================================================================
+    # PHASE 19: P0/P1 REMEDIATION — PHASE A4 (W6, W7, W11, W11b)
+    # ================================================================
+
+    def test_phase2_06_location_delete_with_history_protected(self):
+        """W11/BQ-9: a location with rooms cannot be hard-deleted (PROTECT)."""
+        from django.db.models import ProtectedError
+        with self.assertRaises(ProtectedError):
+            self.loc_ancol.delete()
+        self.assertTrue(KostLocation.objects.filter(pk=self.loc_ancol.pk).exists())
+
+    def test_phase2_07_admin_delete_permission_disabled(self):
+        """W11/W11b: admin delete is disabled for locations and rooms."""
+        from django.contrib import admin as dj_admin
+        from core.admin import KostLocationAdmin, RoomAdmin
+        self.assertFalse(KostLocationAdmin(KostLocation, dj_admin.site).has_delete_permission(None))
+        self.assertFalse(RoomAdmin(Room, dj_admin.site).has_delete_permission(None))
+
+    def test_phase3_08_room_delete_blocked_when_historical_contracts(self):
+        """W11b/BQ-9: a room with only inactive contracts cannot be deleted."""
+        tenant = Tenant.objects.create(
+            full_name='History Tenant', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['A-101'],
+            start_date=date.today() - timedelta(days=60),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        contract.is_active = False
+        contract.end_date = date.today()
+        contract.save()
+        resp = self.admin_ancol_client.post(
+            reverse('room_delete', args=[self.rooms['A-101'].pk])
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Room.objects.filter(pk=self.rooms['A-101'].pk).exists())
+
+    def test_phase13_15_xff_ignored_by_default(self):
+        """W7: X-Forwarded-For is ignored unless explicitly trusted."""
+        from django.core.cache import cache
+        cache.clear()
+        self.public_client.post(reverse('public_payment_step1'), {
+            'kost_location': self.loc_ancol.pk,
+            'room_number': 'no-such-room',
+            'pin': '000000',
+        }, HTTP_X_FORWARDED_FOR='1.2.3.4')
+        self.assertIsNotNone(cache.get('ratelimit:pin_attempt:127.0.0.1'))
+        self.assertIsNone(cache.get('ratelimit:pin_attempt:1.2.3.4'))
+
+    def test_phase13_16_xff_honored_when_enabled(self):
+        """W7: X-Forwarded-For is used when TRUST_X_FORWARDED_FOR=True."""
+        from django.core.cache import cache
+        cache.clear()
+        with override_settings(TRUST_X_FORWARDED_FOR=True):
+            self.public_client.post(reverse('public_payment_step1'), {
+                'kost_location': self.loc_ancol.pk,
+                'room_number': 'no-such-room',
+                'pin': '000000',
+            }, HTTP_X_FORWARDED_FOR='1.2.3.4')
+        self.assertIsNotNone(cache.get('ratelimit:pin_attempt:1.2.3.4'))
+
+    # ================================================================
+    # PHASE 20: P0/P1 REMEDIATION — PHASE A5 (W9)
+    # ================================================================
+
+    def _make_kana_tenant_with_active_contract(self):
+        tenant = Tenant.objects.create(
+            full_name='Kana Resident', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['K-101'],
+            start_date=date.today() - timedelta(days=10),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        return tenant, contract
+
+    def _deactivate_contract(self, contract):
+        contract.is_active = False
+        contract.end_date = date.today()
+        contract.save()
+
+    def test_phase4_12_edit_denied_when_active_at_another_location(self):
+        """W9/BQ-7: old-location admin cannot edit a tenant active elsewhere."""
+        tenant, contract = self._make_kana_tenant_with_active_contract()
+        resp = self.admin_ancol_client.post(
+            reverse('tenant_edit', args=[tenant.pk]),
+            {'full_name': 'Hacked', 'phone_number': '081', 'emergency_contact_phone': '082'}
+        )
+        self.assertEqual(resp.status_code, 404)
+        tenant.refresh_from_db()
+        self.assertEqual(tenant.full_name, 'Kana Resident')
+
+    def test_phase4_13_edit_denied_for_historical_only_tenant(self):
+        """W9/BQ-7: historical-only tenants are read-only for the old location."""
+        tenant = Tenant.objects.create(
+            full_name='Past Resident', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['A-101'],
+            start_date=date.today() - timedelta(days=90),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self._deactivate_contract(contract)
+        resp = self.admin_ancol_client.post(
+            reverse('tenant_edit', args=[tenant.pk]),
+            {'full_name': 'Should Not Change', 'phone_number': '081', 'emergency_contact_phone': '082'}
+        )
+        self.assertEqual(resp.status_code, 404)
+        tenant.refresh_from_db()
+        self.assertEqual(tenant.full_name, 'Past Resident')
+
+    def test_phase4_14_edit_allowed_when_active_at_own_location(self):
+        """W9/BQ-7 regression: tenant active at the staff's location stays editable."""
+        tenant, contract = self._setup_billing_data()
+        resp = self.admin_ancol_client.post(
+            reverse('tenant_edit', args=[tenant.pk]),
+            {'full_name': 'Edited Active', 'phone_number': '081', 'emergency_contact_phone': '082'}
+        )
+        self.assertEqual(resp.status_code, 302)
+        tenant.refresh_from_db()
+        self.assertEqual(tenant.full_name, 'Edited Active')
+
+    def test_phase4_15_assign_denied_for_foreign_history_tenant(self):
+        """W9/PG-1: cross-location move initiation blocked (404) pending owner decision."""
+        tenant = Tenant.objects.create(
+            full_name='Foreign History', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['K-101'],
+            start_date=date.today() - timedelta(days=90),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self._deactivate_contract(contract)
+        resp = self.admin_ancol_client.post(
+            reverse('tenant_assign_room', args=[tenant.pk]),
+            {
+                'room': self.rooms['A-101'].pk,
+                'start_date': date.today().isoformat(),
+                'monthly_rent_amount': '1500000',
+            }
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(TenantContract.objects.filter(tenant=tenant, is_active=True).exists())
+
+    def test_phase4_16_assign_allowed_for_own_history_tenant(self):
+        """W9/BQ-7: a returning tenant with history at the staff's location can be assigned."""
+        tenant = Tenant.objects.create(
+            full_name='Returning', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['A-103'],
+            start_date=date.today() - timedelta(days=90),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self._deactivate_contract(contract)
+        resp = self.admin_ancol_client.post(
+            reverse('tenant_assign_room', args=[tenant.pk]),
+            {
+                'room': self.rooms['A-101'].pk,
+                'start_date': date.today().isoformat(),
+                'monthly_rent_amount': '1500000',
+            }
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(TenantContract.objects.filter(tenant=tenant, is_active=True).exists())
+
+    def test_phase4_17_superuser_cross_location_assign_allowed(self):
+        """W9: superuser retains the sanctioned cross-location move path."""
+        tenant = Tenant.objects.create(
+            full_name='Move By Owner', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['K-101'],
+            start_date=date.today() - timedelta(days=90),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self._deactivate_contract(contract)
+        resp = self.superuser_client.post(
+            reverse('tenant_assign_room', args=[tenant.pk]),
+            {
+                'room': self.rooms['A-101'].pk,
+                'start_date': date.today().isoformat(),
+                'monthly_rent_amount': '1500000',
+            }
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(TenantContract.objects.filter(tenant=tenant, is_active=True).exists())
+
+    # ================================================================
+    # PHASE 21: PRE-COMMIT REVIEW FIXES (RC1–RC4)
+    # ================================================================
+
+    def test_phase16_07_admin_electricity_reading_cannot_be_repointed(self):
+        """RC1: reading's invoice FK is always read-only; the change form drops it."""
+        from django.contrib import admin as dj_admin
+        from finance.admin import ElectricityReadingAdmin
+        ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
+        tenant, contract, invoice = self._setup_payment_data()
+        reading = ElectricityReading.objects.create(
+            invoice=invoice, meter_reading_start=0, meter_reading_end=10,
+            rate_per_kwh=Decimal('1500')
+        )
+        self.assertIn('invoice', ma.get_readonly_fields(None, reading))
+        form_class = ma.get_form(None, reading)
+        self.assertNotIn('invoice', form_class.base_fields)
+
+    def test_phase4_18_assign_page_get_denied_for_foreign_history_tenant(self):
+        """RC2: GET assign page 404s for foreign-history tenants (no PII exposure)."""
+        tenant = Tenant.objects.create(
+            full_name='Foreign PII', phone_number='08123456789',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['K-101'],
+            start_date=date.today() - timedelta(days=90),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        self._deactivate_contract(contract)
+        resp = self.admin_ancol_client.get(
+            reverse('tenant_assign_room', args=[tenant.pk])
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn(b'Foreign PII', resp.content)
+        self.assertNotIn(b'08123456789', resp.content)
+
+    def test_phase12_06_checkout_uses_configured_local_date(self):
+        """RC4: checkout end_date = local business date across a UTC date boundary."""
+        from unittest import mock
+        from django.utils import timezone as dj_timezone
+        tenant = Tenant.objects.create(
+            full_name='TZ Boundary', phone_number='081',
+            emergency_contact_phone='082'
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant, room=self.rooms['A-101'],
+            start_date=date.today() - timedelta(days=30),
+            monthly_rent_amount=Decimal('1500000')
+        )
+        fixed_utc = datetime(2030, 1, 1, 20, 0, tzinfo=dt_timezone.utc)  # 2030-01-02 03:00 WIB
+        real_localdate = dj_timezone.localdate
+        with override_settings(TIME_ZONE='Asia/Jakarta'):
+            with mock.patch(
+                'tenants.views.timezone.localdate',
+                side_effect=lambda: real_localdate(fixed_utc),
+            ):
+                resp = self.admin_ancol_client.post(
+                    reverse('tenant_checkout', args=[tenant.pk])
+                )
+        self.assertEqual(resp.status_code, 302)
+        contract.refresh_from_db()
+        self.assertFalse(contract.is_active)
+        self.assertEqual(contract.end_date, date(2030, 1, 2))
+        # control: the UTC date at that instant is still 2030-01-01
+        self.assertEqual(fixed_utc.date(), date(2030, 1, 1))

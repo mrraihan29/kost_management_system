@@ -12,7 +12,7 @@ class KostLocation(models.Model):
         return self.name
 
 class Room(models.Model):
-    kost_location = models.ForeignKey(KostLocation, on_delete=models.CASCADE, related_name='rooms')
+    kost_location = models.ForeignKey(KostLocation, on_delete=models.PROTECT, related_name='rooms')
     room_number = models.CharField(max_length=20)  # Cth: "A-101"
     price_monthly = models.DecimalField(max_digits=12, decimal_places=2) # Harga dasar kamar
     is_token_electricity = models.BooleanField(default=False) # True=Token, False=Meteran Manual (FR-06)
