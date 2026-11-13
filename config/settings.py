@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import os
 import dj_database_url
+from django.contrib.messages import constants as messages
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -190,6 +191,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Auth URLs
 LOGIN_REDIRECT_URL = '/staff/dashboard/'
 LOGIN_URL = '/accounts/login/'
+
+# Bootstrap 5 has no alert-error class; map Django's ERROR level to danger.
+MESSAGE_TAGS = {
+    messages.ERROR: 'danger',
+}
 
 
 # ──────────────────────────────────────────────

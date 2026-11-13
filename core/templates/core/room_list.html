@@ -18,7 +18,7 @@
 {% if rooms %}
 <div class="card-paper overflow-hidden">
     <div class="table-responsive">
-        <table class="table align-middle mb-0 table-hover">
+        <table class="table align-middle mb-0 table-hover table-stack">
             <thead style="background-color: var(--color-primary-light);">
                 <tr class="text-muted small text-uppercase">
                     <th class="ps-4 py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">No. Kamar</th>
@@ -33,18 +33,18 @@
             <tbody>
                 {% for room in rooms %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4 fw-bold">{{ room.room_number }}</td>
-                    <td>{{ room.kost_location.name }}</td>
-                    <td>Rp {{ room.price_monthly|intcomma }}</td>
-                    <td>{{ room.capacity }} orang</td>
-                    <td>
+                    <td class="ps-4 fw-bold" data-label="No. Kamar">{{ room.room_number }}</td>
+                    <td data-label="Lokasi">{{ room.kost_location.name }}</td>
+                    <td data-label="Harga/Bulan">Rp {{ room.price_monthly|intcomma }}</td>
+                    <td data-label="Kapasitas">{{ room.capacity }} orang</td>
+                    <td data-label="Listrik">
                         {% if room.is_token_electricity %}
                             <span class="badge bg-info text-dark">Token</span>
                         {% else %}
                             <span class="badge bg-secondary">Meteran</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         {% if room.active_contract %}
                             <span class="badge bg-success">Terisi</span>
                             <small class="d-block text-muted">{{ room.active_contract.tenant.full_name }}</small>
@@ -52,7 +52,7 @@
                             <span class="badge bg-light text-muted border">Kosong</span>
                         {% endif %}
                     </td>
-                    <td class="pe-4 text-end">
+                    <td class="pe-4 text-end cell-actions">
                         <div class="d-inline-flex align-items-center gap-2">
                             <a href="{% url 'room_edit' room.pk %}" class="btn btn-sm btn-ink-outline" title="Edit">
                                 <i class="fas fa-edit"></i>

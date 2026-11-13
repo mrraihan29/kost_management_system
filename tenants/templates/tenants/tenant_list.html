@@ -42,7 +42,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table align-middle mb-0 table-hover">
+        <table class="table align-middle mb-0 table-hover table-stack">
             <thead style="background-color: var(--color-primary-light);">
                 <tr>
                     <th class="ps-4 py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">Nama Penghuni</th>
@@ -56,7 +56,7 @@
             <tbody>
                 {% for tenant in tenants %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4 py-3">
+                    <td class="ps-4 py-3" data-label="Nama Penghuni">
                         <div class="d-flex align-items-center">
                             <!-- Inisial Nama (Avatar) -->
                             <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white me-3" style="width: 40px; height: 40px; font-weight: bold;">
@@ -75,7 +75,7 @@
                             </div>
                         </div>
                     </td>
-                    <td>
+                    <td data-label="Kamar">
                         {% with contract=tenant.contracts.last %}
                             {% if contract and contract.is_active %}
                                 <span class="badge bg-light text-dark border border-secondary">{{ contract.room.room_number }}</span>
@@ -84,11 +84,11 @@
                             {% endif %}
                         {% endwith %}
                     </td>
-                    <td>
+                    <td data-label="Kontak">
                         <div class="small"><i class="fas fa-phone-alt me-1 text-muted"></i> {{ tenant.phone_number }}</div>
                         <div class="small text-muted">Darurat: {{ tenant.emergency_contact_phone }}</div>
                     </td>
-                    <td class="text-muted small">
+                    <td class="text-muted small" data-label="Tgl Masuk">
                         {% with contract=tenant.contracts.last %}
                             {% if contract %}
                                 {{ contract.start_date|date:"d M Y" }}
@@ -97,7 +97,7 @@
                             {% endif %}
                         {% endwith %}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         {% with contract=tenant.contracts.last %}
                             {% if contract and contract.is_active %}
                                 <span class="badge-pill badge-success">Aktif</span>
@@ -106,7 +106,7 @@
                             {% endif %}
                         {% endwith %}
                     </td>
-                    <td class="pe-4 text-end">
+                    <td class="pe-4 text-end cell-actions">
                         <div class="d-flex justify-content-end gap-2">
                             
                             <!-- LOGIKA TOMBOL -->

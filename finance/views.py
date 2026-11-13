@@ -137,7 +137,10 @@ def public_payment_step2(request):
         'form': form,
         'tenant_name': contract.tenant.full_name,
         'room_info': str(contract.room),
-        'invoice': active_invoice
+        'invoice': active_invoice,
+        'pending_invoice': Invoice.objects.filter(
+            contract=contract, status='MENUNGGU_VERIFIKASI'
+        ).order_by('-billing_period_start').first()
     }
     return render(request, 'finance/step2_upload.html', context)
 

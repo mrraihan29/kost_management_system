@@ -1895,6 +1895,20 @@ class FullBusinessProcessTest(TestCase):
         self.assertNotContains(resp, 'PDF')
         self.assertNotContains(resp, '2MB')
 
+    def test_phase7_14_step2_menunggu_never_shows_lunas(self):
+        """Regression: while the only invoice is MENUNGGU_VERIFIKASI, the portal
+        must say MENUNGGU VERIFIKASI and must never claim LUNAS."""
+        tenant, contract, invoice = self._setup_payment_data()
+        session = self.public_client.session
+        session['verified_contract_id'] = contract.id
+        session.save()
+        invoice.status = 'MENUNGGU_VERIFIKASI'
+        invoice.save()
+        resp = self.public_client.get(reverse('public_payment_step2'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'MENUNGGU VERIFIKASI')
+        self.assertNotContains(resp, 'Tidak ada tagihan aktif saat ini')
+
     # --- W13: income labels ---
 
     def test_phase5_05_dashboard_income_label_cash(self):
@@ -2040,6 +2054,18 @@ class FullBusinessProcessTest(TestCase):
         verifiers = [row[4] for row in ws2.iter_rows(min_row=2, values_only=True)]
         self.assertIn('admin_ancol', verifiers)
         self.assertNotEqual(stale.pk, payment.pk)
+
+    def test_phase8_16_error_message_renders_alert_danger(self):
+        """MESSAGE_TAGS: an error-level Django message renders as Bootstrap alert-danger."""
+        tenant, contract, invoice, payment = self._setup_verification_data()
+        resp = self.admin_ancol_client.post(
+            reverse('verify_payment', args=[payment.pk, 'reject']),
+            {'rejection_note': 'Bukti tidak jelas'},
+            follow=True,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'alert-danger')
+        self.assertNotContains(resp, 'alert-error')
 
     def test_phase16_01_audit_payment_history_clean(self):
         """W1: audit command classifies a clean pending payment set."""

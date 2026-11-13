@@ -25,6 +25,10 @@
     --color-danger: #DC2626;        /* Red 600 */
     --color-danger-bg: #FEE2E2;     /* Red 100 */
 
+    /* Bootstrap variable bridge: keep text-/bg-/border-primary utilities on the brand hue */
+    --bs-primary: #4338CA;
+    --bs-primary-rgb: 67, 56, 202;
+
 }
 
 /* --- 2. GLOBAL RESET & BASE --- */
@@ -52,13 +56,6 @@ a { text-decoration: none; transition: all 0.2s ease; }
     border-radius: 12px; /* Sudut halus modern */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); /* Bayangan tipis melayang */
     overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card-paper:hover {
-    /* Efek "terangkat" sedikit saat disentuh mouse */
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
 }
 
 .card-header-clean {
@@ -146,6 +143,165 @@ a { text-decoration: none; transition: all 0.2s ease; }
     background-color: var(--color-bg-card);
     border-right: 1px solid var(--color-border);
     min-height: 100vh;
+}
+
+/* --- 8. RELAYOUT: MOBILE TABLE COMPOSITION --- */
+/* Below 768px, list tables recompose into stacked cards:
+   each row becomes a labeled block and actions stay visible. */
+@media (max-width: 768px) {
+    .table-stack thead {
+        display: none;
+    }
+
+    .table-stack,
+    .table-stack tbody,
+    .table-stack tr,
+    .table-stack td {
+        display: block;
+        width: 100%;
+    }
+
+    .table-stack tr {
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        background: var(--color-bg-card);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        margin: 0.75rem;
+        width: auto;
+    }
+
+    .table-stack td {
+        border: 0;
+        padding: 0.4rem 0.9rem;
+    }
+
+    .table-stack td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+    }
+
+    .table-stack td:first-child {
+        padding-top: 0.75rem;
+    }
+
+    .table-stack td.cell-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 0.9rem;
+        margin-top: 0.35rem;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .table-stack td.cell-actions::before {
+        content: none;
+    }
+
+    .table-stack td.table-stack-empty {
+        padding: 2rem 1rem;
+    }
+
+    .table-stack td.table-stack-empty::before {
+        content: none;
+    }
+
+    .table-stack .btn {
+        min-height: 40px;
+    }
+}
+
+/* --- 9. SETTLE: SINGLE PRIMARY VOICE --- */
+/* Bootstrap's default blue competed with the indigo brand on CTAs,
+   inputs, links and pagination. One token narrates; semantic colors
+   (success / warning / danger) stay untouched. */
+.btn-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:focus {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.btn-primary:focus,
+.btn-primary:focus-visible {
+    box-shadow: 0 0 0 0.25rem var(--color-primary-light);
+}
+
+.btn-primary:disabled {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    opacity: 0.55;
+}
+
+.text-primary {
+    color: var(--color-primary);
+}
+
+.border-primary {
+    border-color: var(--color-primary) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.25rem var(--color-primary-light);
+}
+
+.page-item.active .page-link {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.page-link {
+    color: var(--color-primary);
+}
+
+.page-link:focus {
+    box-shadow: 0 0 0 0.25rem var(--color-primary-light);
+}
+
+/* --- 10. FINISH: ROOM TILE + REDUCED MOTION --- */
+.room-tile {
+    transition: transform 0.2s ease;
+}
+
+.room-tile:hover {
+    transform: scale(1.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-paper,
+    .room-tile,
+    .nav-link-clean,
+    .btn,
+    .btn-ink,
+    .btn-ink-outline,
+    .btn-primary,
+    .form-control,
+    .form-select,
+    a {
+        transition: none;
+    }
+
+    .room-tile:hover {
+        transform: none;
+    }
+
+    .btn-ink:hover,
+    .btn-primary:hover {
+        transform: none;
+    }
 }
 
 .sidebar-brand {
