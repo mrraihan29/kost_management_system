@@ -1,0 +1,503 @@
+# Decision ledger for the Evy Kost Management (EKM) revision.
+# Schema and rules: naobi-sdlc references/ledger.md
+schema_version: 1
+project: evy-kost-management
+test_globs:
+  - "tests_simulation.py"
+  - "tests_postgres_concurrency.py"
+  - "**/tests.py"
+  - "e2e/**/*.spec.ts"
+entries:
+  - id: R-001
+    type: requirement
+    version: 1
+    status: active
+    topic: 1
+    answer: "ya benar"
+    recommendation: "Tiga pengguna. Owner ingin melihat kondisi semua lokasi dan uang masuk. Staff lokasi ingin menagih, memverifikasi bayaran, dan mencatat listrik dari HP. Penghuni ingin tahu tagihannya dan membayar tanpa bingung. Tidak ada pengguna lain."
+    statement: "The product serves exactly three user types: Owner (sees all locations and income), Staff (bills, verifies payments and records electricity for one location, from a phone) and Tenant (sees their invoice and pays without confusion)."
+    acceptance:
+      - "Every screen is reachable by exactly one of the roles Owner, Staff or Tenant"
+      - "No fourth role or account type exists"
+
+  - id: R-002
+    type: requirement
+    version: 1
+    status: active
+    topic: 1
+    answer: "setuju dengan alur kamu! terutama alur keluar tagihan. kan disini ada 3 kost berbeda, kost ancol itu tagihan keluar sesuai dengan masing masing kamar terakhir bayar kapan. 2 kost lain nya tagihan muncul serentak ketika admin serentakkan keluarkan tagihan"
+    recommendation: "Tiga alur ini yang jadi prioritas: (a) penghuni baru dari pendaftaran, pilih kamar, sampai tagihan pertama; (b) siklus tagihan bulanan dari generate, input listrik, bayar, sampai verifikasi; (c) portal penghuni dengan PIN."
+    statement: "The revision prioritises three flows: tenant onboarding (register, assign room, first invoice), the monthly billing cycle (issue, electricity, pay, verify) and the tenant portal. Invoice issuing is the top priority: the Ancol location issues invoices per room on that room's own cycle, the two other locations issue all invoices at once when Staff triggers it."
+    acceptance:
+      - "Each of the three flows can be completed end to end without leaving its guided path"
+      - "At Ancol, each room's invoice is issued on that room's own cycle date"
+      - "At the two other locations, one Staff action issues the invoices for every active contract of that location"
+
+  - id: R-003
+    type: requirement
+    version: 1
+    status: active
+    topic: 2
+    answer: "setuju"
+    recommendation: "Staff baru bisa menyelesaikan verifikasi pembayaran dan input listrik dari HP tanpa dibantu dalam waktu di bawah 2 menit per tagihan, dan penghuni bisa mengunggah bukti bayar di bawah 3 menit pada percobaan pertama."
+    statement: "A first-time Staff user completes payment verification and electricity entry on a phone, unaided, in under 2 minutes per invoice; a Tenant uploads a payment proof in under 3 minutes on the first attempt."
+    acceptance:
+      - "Timed walkthrough: Staff verifies one payment and records one meter reading on a 375px viewport in under 120 seconds"
+      - "Timed walkthrough: Tenant goes from PIN entry to upload confirmation in under 180 seconds"
+
+  - id: D-001
+    type: decision
+    version: 1
+    status: active
+    topic: 3
+    answer: "setuju"
+    recommendation: "Revisi di atas kode yang ada. Model data dan aturan finansial dipertahankan (185 test lulus); yang dirombak adalah alur, struktur halaman, tampilan, dan kode view yang berulang."
+    statement: "The revision is done in place on the existing codebase: the data model and financial rules are kept, while flows, page structure, visual design and duplicated view code are reworked."
+
+  - id: R-004
+    type: requirement
+    version: 1
+    status: active
+    topic: 3
+    answer: "setuju"
+    recommendation: "Di luar cakupan: aplikasi mobile native, payment gateway, akun login penghuni dengan email, dan fitur multi-pemilik. Rilis pertama hanya merapikan fitur yang sudah ada, tanpa fitur baru."
+    statement: "Out of scope: native mobile app, payment gateway, tenant email login and multi-owner support. The first release only reworks existing features and adds none."
+    acceptance:
+      - "The first release contains no feature absent from the current application"
+      - "No payment-gateway, native-app or tenant-account code exists"
+
+  - id: R-005
+    type: requirement
+    version: 1
+    status: active
+    topic: 5
+    answer: "sekarang 3 lokasi, campuran antar kos kapasitasnya. ada yang 80 tapi kita anggap ada 3 lokasi masing masing lokasi ada 80 kamar"
+    statement: "The system is sized for 3 locations of 80 rooms each (240 rooms); main pages respond in under 1 second at that size."
+    acceptance:
+      - "With seed data of 3 locations x 80 rooms and 12 months of invoices, dashboard, invoice list and room list each render in under 1000 ms at p95"
+
+  - id: R-006
+    type: requirement
+    version: 1
+    status: active
+    topic: 6
+    answer: "setuju"
+    recommendation: "Foto KTP dihapus 30 hari setelah checkout; data penghuni dan riwayat tagihan disimpan 5 tahun untuk pembukuan, lalu dihapus."
+    statement: "Personal data (name, phone, emergency contact, ID-card photo) is processed under UU 27/2022: the ID-card photo is deleted 30 days after checkout; tenant records and invoice history are kept 5 years for bookkeeping, then deleted."
+    acceptance:
+      - "A scheduled job deletes ID-card photos of tenants checked out more than 30 days ago"
+      - "A scheduled job deletes tenant records and invoices older than 5 years after checkout"
+
+  - id: R-007
+    type: requirement
+    version: 1
+    status: active
+    topic: 7
+    answer: "setuju"
+    recommendation: "Tiga peran tetap seperti sekarang: Owner melihat semua lokasi, Staff hanya lokasinya sendiri, Penghuni masuk dengan lokasi + nomor kamar + PIN 6 digit. Standar keamanan OWASP ASVS Level 2, karena ada login, data pribadi, dan bukti pembayaran."
+    statement: "Owner accesses all locations, Staff only their assigned location, Tenant signs in with location + room number + 6-digit PIN; the application meets OWASP ASVS 5.0 Level 2."
+    acceptance:
+      - "Staff requests for another location's rooms, tenants, invoices, costs or tickets are denied"
+      - "Tenant portal access requires a matching location, room number and active-contract PIN, rate limited"
+
+  - id: D-002
+    type: decision
+    version: 1
+    status: active
+    topic: 8
+    answer: "setuju. pastikan aja aku udah menggunakan semua versi dan semua library dengan versi terstabil dan baru. jika tidak yakin gunakan context7"
+    recommendation: "Tetap Django 5 dengan template server-side, Bootstrap, dan PostgreSQL. Alasan terukur: 185 test dan seluruh aturan finansial sudah ada di Python; pindah stack berarti menulis ulang semuanya tanpa manfaat bagi pengguna."
+    statement: "The stack stays Django with server-rendered templates and PostgreSQL (measurable reason: 185 passing tests and all financial rules already exist in Python)."
+
+  - id: R-008
+    type: requirement
+    version: 1
+    status: active
+    topic: 8
+    answer: "setuju. pastikan aja aku udah menggunakan semua versi dan semua library dengan versi terstabil dan baru. jika tidak yakin gunakan context7"
+    statement: "Python, Django and every dependency run on their latest stable release at the time of the upgrade."
+    acceptance:
+      - "pip list --outdated reports no outdated direct dependency at release time"
+      - "The Django version in use is inside its upstream security-support window"
+
+  - id: D-003
+    type: decision
+    version: 1
+    status: active
+    topic: 9
+    answer: "kalo lebih enteng font dari google font maka gunakan dari google font saja"
+    recommendation: "Tidak ada integrasi baru. Pembayaran tetap transfer manual + unggah bukti, dan pengingat tetap lewat tautan WhatsApp yang dibuka staff. Font di-host sendiri, bukan dari Google Fonts."
+    statement: "No new external integration is added: payment stays manual transfer plus proof upload, reminders stay Staff-opened WhatsApp links. The font source is whichever option transfers the fewest bytes."
+
+  - id: R-009
+    type: requirement
+    version: 1
+    status: active
+    topic: 10
+    answer: "UI UX kita akan redesign deh, biar lebih minimalis namun tetap professional"
+    recommendation: "Web saja, dirancang untuk HP lebih dulu, Bahasa Indonesia saja termasuk format tanggal dan Rupiah. Aksesibilitas WCAG 2.2 AA."
+    statement: "The UI is web only, designed mobile-first, in Indonesian only (dates and Rupiah in Indonesian format) and meets WCAG 2.2 AA."
+    acceptance:
+      - "Every page is usable at a 375px viewport without horizontal page scroll"
+      - "All dates and amounts render in Indonesian format"
+      - "axe reports zero critical or serious violations"
+
+  - id: D-004
+    type: decision
+    version: 1
+    status: deferred
+    topic: 10
+    answer: "UI UX kita akan redesign deh, biar lebih minimalis namun tetap professional"
+    statement: "The UI is fully redesigned to a minimalist yet professional visual direction, chosen by the owner from mockups."
+    prototype_question: "Which of the mockup directions for the Staff dashboard and Tenant portal reads as minimalist yet professional to the owner, and are the current logo and indigo colour kept?"
+
+  - id: R-010
+    type: requirement
+    version: 1
+    status: active
+    topic: 13
+    answer: "website kita adalah https://ekm.web.id"
+    recommendation: "Coolify di VPS Hostinger Anda, dua lingkungan (staging dan production), backup database harian ke Backblaze B2."
+    statement: "Production is served at https://ekm.web.id."
+    acceptance:
+      - "https://ekm.web.id/health/ returns status ok over HTTPS"
+
+  - id: R-011
+    type: requirement
+    version: 1
+    status: active
+    topic: 14
+    answer: "tidak ada"
+    statement: "There is no hard deadline, cost ceiling or stated VPS resource limit; the owner is the single decider."
+    acceptance:
+      - "No release date or budget figure is used as a planning constraint"
+
+  # --- Round 2 (owner numbered answers 1-12 map to Q14-Q25) ---
+  - id: R-012
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Tanggal tetap sesuai tanggal mulai kontrak (masuk tanggal 10, tagihan selalu tanggal 10). Tanggal itu tidak bergeser walau penghuni membayar terlambat."
+    statement: "Critical. As Staff at Ancol, I want each room's cycle date to equal the contract start day of month so that billing dates never drift; a late payment does not move the cycle date."
+    acceptance:
+      - "A contract starting on the 10th gets invoices dated the 10th of every month"
+      - "Paying an invoice late leaves the next invoice's cycle date unchanged"
+      - "A start day of 29-31 clamps to the last day of shorter months"
+
+  - id: R-013
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Terbit otomatis 7 hari sebelum tanggal siklus kamar itu, tanpa staff menekan tombol, jatuh tempo 10 hari setelah tanggal siklus."
+    statement: "Critical. As Staff at Ancol, I want each room's invoice issued automatically 7 days before its cycle date, due 10 days after the cycle date, so that nobody has to trigger it."
+    acceptance:
+      - "A daily job creates the invoice for a per-room-cycle contract when the cycle date is 7 days away"
+      - "The invoice due date equals the cycle date plus 10 days"
+      - "Running the job twice creates no duplicate invoice"
+
+  - id: R-014
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Satu tombol \"Terbitkan tagihan\" per lokasi. Staff memilih bulannya, melihat jumlah tagihan yang akan dibuat, lalu mengonfirmasi. Tagihan bertanggal 1, jatuh tempo tanggal 11."
+    statement: "Critical. As Staff at a simultaneous-billing location, I want one action that issues the chosen month's invoices for every active contract, after showing how many will be created, so that billing happens once and predictably. Invoices are dated the 1st and due the 11th."
+    acceptance:
+      - "The action shows the number of invoices to be created before confirmation"
+      - "Confirming creates one invoice per active contract dated the 1st and due the 11th of the chosen month"
+      - "Repeating the action for the same month creates no duplicate invoice"
+
+  - id: R-015
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "just fyi, hanya kost ancol yang ada bayar listrik lewat website. dua lain nya menggunakan token listrik PLN per masing masing kamar jadi udah aman. sisanya setuju"
+    recommendation: "Untuk kamar bermeteran, tagihan baru terlihat dan bisa dibayar penghuni setelah staff mengisi angka meteran. Kamar token langsung bisa dibayar."
+    statement: "Critical. Only the Ancol location bills electricity through the application; the two other locations use per-room PLN tokens. An invoice of a metered room becomes visible and payable to the Tenant only after Staff records the meter reading; an invoice of a token room is payable immediately."
+    acceptance:
+      - "A metered-room invoice without a reading is not shown in the Tenant portal"
+      - "After the reading is saved the invoice total includes electricity and the invoice is payable"
+      - "A token-room invoice is payable as soon as it is issued"
+
+  - id: R-016
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Satu formulir berisi data penghuni, kamar, dan tanggal masuk; tagihan pertama langsung dibuat saat disimpan."
+    statement: "As Staff, I want one form for tenant data, room and move-in date that also creates the first invoice on save, so that onboarding is a single step."
+    acceptance:
+      - "Submitting the form creates the tenant, the active contract with a PIN and the first invoice in one transaction"
+      - "A validation error creates none of them"
+
+  - id: R-017
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Setujui dan tolak dilakukan di halaman detail tagihan, dengan foto bukti tampil di halaman yang sama. Menolak wajib mengisi alasan, dan alasan itu terlihat oleh penghuni di portal."
+    statement: "Critical. As Staff, I want to approve or reject a payment on the invoice detail page with the proof image shown on the same page; rejecting requires a reason and the Tenant sees that reason in the portal."
+    acceptance:
+      - "The invoice detail page of an invoice awaiting verification shows the proof image and approve and reject actions"
+      - "Reject without a reason is refused"
+      - "The Tenant portal shows the rejection reason for the rejected payment"
+
+  - id: R-018
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju"
+    recommendation: "Setelah PIN, penghuni masuk ke satu halaman utama berisi tagihan aktif dan statusnya, tombol unggah bukti, riwayat, dan lapor kerusakan."
+    statement: "Critical. As a Tenant, after entering my PIN I land on one home page showing my open invoice with its status, the proof upload action, payment history and damage reporting."
+    acceptance:
+      - "A successful PIN entry lands on a page that shows invoice status, upload action, history link and damage-report link"
+      - "The upload confirmation keeps the Tenant signed in to that home page"
+
+  - id: D-005
+    type: decision
+    version: 1
+    status: active
+    topic: 11
+    answer: "setuju"
+    recommendation: "Kode dan komentar berbahasa Inggris, teks tampilan berbahasa Indonesia. Aturan bisnis ditaruh di services, bukan di view. Pengecekan lokasi staff memakai satu fungsi bersama. Format dan lint dengan ruff."
+    statement: "Code and comments are English, UI text is Indonesian; business rules live in service modules, not views; Staff location scoping goes through one shared function; ruff formats and lints."
+
+  - id: R-019
+    type: requirement
+    version: 1
+    status: active
+    topic: 12
+    answer: "setuju"
+    recommendation: "Alur yang tidak boleh rusak: terbit tagihan, unggah bukti, verifikasi, input listrik, checkout, dan isolasi antar lokasi. Test Django yang ada dipertahankan, ditambah test browser Playwright untuk alur-alur itu beserta cek aksesibilitas."
+    statement: "The critical flows are invoice issuing, proof upload, payment verification, electricity entry, checkout and cross-location isolation; the existing Django tests are kept and each critical flow gets a Playwright e2e test with an axe check."
+    acceptance:
+      - "Each of the six critical flows has a Playwright e2e test tagged with its ledger id"
+      - "The existing Django test suite passes"
+
+  - id: D-006
+    type: decision
+    version: 1
+    status: active
+    topic: 8
+    answer: "setuju"
+    recommendation: "Naik ke Python dan Django terbaru (seri 6.1) beserta semua library di tabel di atas, dikerjakan paling awal sebelum perombakan lain."
+    statement: "Python, Django (6.1 series) and all dependencies are upgraded to their latest stable releases as the first build step, before any other rework."
+
+  - id: D-007
+    type: decision
+    version: 1
+    status: active
+    topic: 9
+    answer: "setuju"
+    recommendation: "Pakai font bawaan sistem. Ini juga menyelesaikan masalah font yang diblokir CSP."
+    statement: "The UI uses the system font stack; no web font is downloaded."
+
+  - id: R-020
+    type: requirement
+    version: 1
+    status: active
+    topic: 13
+    answer: "setuju"
+    recommendation: "Coolify di VPS Hostinger, production di ekm.web.id dan staging di staging.ekm.web.id, backup database harian ke Backblaze B2. ekm.web.id saya anggap sudah berisi data nyata, jadi setiap migrasi didahului backup."
+    statement: "The application is deployed with Coolify on the owner's Hostinger VPS in two environments, production at ekm.web.id and staging at staging.ekm.web.id; the database is backed up daily to Backblaze B2 and before every migration, because production holds real data."
+    acceptance:
+      - "staging.ekm.web.id and ekm.web.id run as separate environments with separate databases"
+      - "A daily database backup lands in the B2 bucket"
+      - "A backup is taken before each production migration"
+
+  # --- Round 3 (Q27-Q42, owner answered "setuju semua") ---
+  - id: R-021
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Tiap lokasi menyimpan nama bank, nomor rekening, dan nama pemilik rekening yang diisi Owner. Ketiganya tampil di halaman tagihan penghuni bersama nominal yang harus ditransfer."
+    statement: "Critical. Each location stores a bank name, account number and account holder set by the Owner; the Tenant invoice page shows them with the exact amount to transfer."
+    acceptance:
+      - "Only the Owner can edit a location's bank details"
+      - "The Tenant invoice page shows bank name, account number, account holder and the invoice total"
+
+  - id: R-022
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Portal menampilkan semua tagihan yang belum lunas, yang paling lama di atas, dan tiap tagihan diunggah buktinya sendiri-sendiri."
+    statement: "The Tenant portal lists every unpaid invoice, oldest first, and each invoice takes its own payment proof."
+    acceptance:
+      - "A Tenant with two unpaid invoices sees both, the older one first"
+      - "Uploading a proof for one invoice leaves the other invoice's status unchanged"
+
+  - id: R-023
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Di Ancol, tagihan pertama satu bulan penuh mulai tanggal masuk. Di dua kost lain, tagihan pertama dihitung prorata harian sampai akhir bulan, lalu penuh mulai tanggal 1 berikutnya."
+    statement: "The first invoice of a per-room-cycle contract is one full month from the move-in date; the first invoice of a simultaneous-billing contract is prorated by day from move-in to the end of that month, and full from the next 1st."
+    acceptance:
+      - "Per-room cycle: move-in on the 10th creates a first invoice of the full monthly rent dated the 10th"
+      - "Simultaneous: move-in on the 21st of a 30-day month creates a first invoice of 10/30 of the monthly rent"
+      - "Simultaneous: the following month's invoice is the full monthly rent"
+
+  - id: R-024
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Tidak ada denda. Tagihan yang lewat jatuh tempo berstatus \"Telat\", masuk daftar kerja staff, dan punya tombol pengingat WhatsApp."
+    statement: "There is no late fee; an invoice past its due date gets the status Telat, appears in the Staff work queue and offers a WhatsApp reminder action."
+    acceptance:
+      - "An unpaid invoice past its due date is marked Telat by the daily job"
+      - "The invoice total is unchanged by lateness"
+      - "The Staff work queue lists it with a WhatsApp reminder link"
+
+  - id: R-025
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Checkout hanya bisa kalau semua tagihan lunas, tanpa pengembalian atau prorata bulan terakhir. Uang jaminan tidak dicatat di sistem."
+    statement: "Critical. Checkout is allowed only when every invoice of the contract is paid; the last month is neither refunded nor prorated; deposits are not recorded."
+    acceptance:
+      - "Checkout with an unpaid or awaiting-verification invoice is refused"
+      - "Checkout creates no refund or credit record"
+      - "After checkout the room is available"
+
+  - id: R-026
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Satu dasar di semua halaman, yaitu tanggal pembayaran diverifikasi (uang yang benar-benar masuk)."
+    statement: "Every income figure (dashboard, financial report, Excel export) is computed on one basis: the date the payment was verified."
+    acceptance:
+      - "For the same month and location, dashboard income, report income and export income are equal"
+      - "A payment verified in March for a February invoice counts as March income"
+
+  - id: R-027
+    type: requirement
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Owner mengatur dua hal per lokasi: mode tagihan (per kamar atau serentak) dan apakah listrik ditagih lewat website. Ancol: per kamar dan listrik lewat website. Dua kost lain: serentak dan tanpa listrik."
+    statement: "Each location has two Owner-set settings, billing mode (per-room cycle or simultaneous) and electricity billed in-app (yes or no); no behaviour depends on a location's name. Ancol is per-room with electricity; the two other locations are simultaneous without electricity."
+    acceptance:
+      - "Renaming a location changes no billing behaviour"
+      - "Only the Owner can change billing mode and the electricity setting"
+      - "The migration sets Ancol to per-room with electricity and the other locations to simultaneous without electricity"
+
+  - id: R-028
+    type: requirement
+    version: 1
+    status: active
+    topic: 10
+    answer: "setuju semua"
+    recommendation: "Halaman utama Staff berisi daftar \"yang perlu dikerjakan\": bukti menunggu verifikasi, meteran belum diisi, tagihan telat, dan laporan kerusakan baru. Peta kamar dan angka ringkasan pindah ke bawahnya. Menu Staff jadi lima: Beranda, Tagihan, Penghuni & Kamar, Pengeluaran, Kerusakan. Owner mendapat tambahan Laporan Keuangan, Lokasi, dan Staff, dengan halaman utama berupa ringkasan per lokasi."
+    statement: "The Staff home page is a work queue (proofs awaiting verification, meter readings missing, late invoices, new damage reports) with the room map and summary figures below it. Staff navigation has five items: Beranda, Tagihan, Penghuni & Kamar, Pengeluaran, Kerusakan. The Owner additionally has Laporan Keuangan, Lokasi and Staff, and an Owner home page summarising each location."
+    acceptance:
+      - "The Staff home page lists the four queue types above the room map"
+      - "Each queue item links to the page where it is resolved"
+      - "Staff navigation shows exactly five items; Owner navigation shows eight"
+
+  - id: D-008
+    type: decision
+    version: 1
+    status: active
+    topic: 8
+    answer: "setuju semua, tapi mau tanya apakah boostrap bisa membuat tampilan sangat modern dan bagus untuk component nya? atau lebih mending tailwind ataupun library lain?"
+    recommendation: "Tanpa framework JavaScript; aset di-host di server sendiri. Ini menyimpang dari standar NAOBI yang mewajibkan TypeScript di frontend; dicatat sebagai pengecualian dengan alasan halaman dirender server dan JavaScript-nya sangat sedikit."
+    statement: "The frontend is server-rendered Django templates with no JavaScript framework; all CSS and JS assets are served from the application's own origin. This is a recorded deviation from the Naobi frontend-TypeScript rule (reason: server-rendered pages, minimal JavaScript)."
+
+  - id: D-009
+    type: decision
+    version: 1
+    status: deferred
+    topic: 8
+    answer: "setuju semua, tapi mau tanya apakah boostrap bisa membuat tampilan sangat modern dan bagus untuk component nya? atau lebih mending tailwind ataupun library lain?"
+    statement: "The CSS framework (themed Bootstrap or Tailwind CSS) is chosen from mockups of the same screens."
+    prototype_question: "Built as mockups of the Staff home page and the Tenant invoice page, does Tailwind CSS (standalone CLI, no Node) give a visibly more modern result than themed Bootstrap for comparable effort, and which does the owner pick?"
+
+  - id: D-010
+    type: decision
+    version: 1
+    status: active
+    topic: 8
+    answer: "setuju semua"
+    recommendation: "Tagihan otomatis Ancol, penanda telat, dan penghapusan data sesuai masa simpan dijalankan harian pukul 00.05 WIB lewat scheduled task Coolify. Tanpa Celery dan tanpa Redis."
+    statement: "Scheduled work (per-room invoice issuing, late marking, retention deletion) runs daily at 00:05 Asia/Jakarta as Django management commands triggered by Coolify scheduled tasks; no Celery and no Redis."
+
+  - id: R-029
+    type: requirement
+    version: 1
+    status: active
+    topic: 13
+    answer: "setuju semua"
+    recommendation: "Foto KTP dan bukti bayar disimpan di volume permanen di VPS dan ikut backup harian ke Backblaze B2."
+    statement: "Uploaded files (ID-card photos, payment proofs, ticket photos, cost proofs) live on a persistent volume and are included in the daily backup to Backblaze B2."
+    acceptance:
+      - "Uploaded files survive a redeploy"
+      - "The daily backup in B2 contains the media files"
+
+  - id: R-030
+    type: requirement
+    version: 1
+    status: active
+    topic: 5
+    answer: "setuju semua"
+    recommendation: "GitHub Actions menjalankan semua pemeriksaan di tiap perubahan. Error dipantau dengan Sentry gratis dan uptime dengan UptimeRobot gratis. Target ketersediaan 99% per bulan, dengan kehilangan data maksimal 24 jam."
+    statement: "Availability is at least 99% per month and data loss at most 24 hours; GitHub Actions runs every CI gate on each change; errors are tracked in Sentry (free tier) and uptime by UptimeRobot (free tier)."
+    acceptance:
+      - "A pull request cannot merge with a failing CI gate"
+      - "An unhandled server error appears in Sentry"
+      - "The external monitor checks the health endpoint and reports monthly uptime"
+
+  - id: R-031
+    type: requirement
+    version: 1
+    status: active
+    topic: 7
+    answer: "setuju semua"
+    recommendation: "Owner wajib memakai kode dari aplikasi authenticator saat login; Staff tidak wajib."
+    statement: "The Owner must pass a TOTP authenticator code at sign-in; it is optional for Staff unless ASVS 5.0 Level 2 is found in Design to require it."
+    acceptance:
+      - "An Owner sign-in without a valid TOTP code is refused"
+      - "Staff can sign in with password only"
+
+  - id: R-032
+    type: requirement
+    version: 1
+    status: active
+    topic: 6
+    answer: "setuju semua"
+    recommendation: "Dasar pemrosesan adalah kontrak sewa. Portal menampilkan pemberitahuan privasi singkat. Penghuni bisa minta koreksi atau penghapusan data lewat staff. Kebocoran data dilaporkan paling lambat 3 x 24 jam."
+    statement: "The legal basis for processing tenant personal data is the rental contract; the Tenant portal shows a short privacy notice; a Tenant can request correction or deletion through Staff; a personal-data breach is notified within 3 x 24 hours."
+    acceptance:
+      - "The Tenant portal shows a privacy notice naming the data kept, its purpose and its retention"
+      - "Staff can correct a Tenant's personal data and delete a checked-out Tenant's data on request"
+      - "A written breach procedure with the 3 x 24 hour deadline exists in the repository"
+
+  - id: D-011
+    type: decision
+    version: 1
+    status: active
+    topic: 14
+    answer: "setuju semua"
+    recommendation: "Pekerjaan audit UI/UX yang belum di-commit di-commit dulu, termasuk penghapusan empat file panduan. Project Plane baru bernama \"Evy Kost Management\" dengan kode EKM, berisi tujuh fase SDLC berurutan beserta tiga gerbang persetujuan. Tiket pengerjaan rinci ditulis di fase Plan."
+    statement: "The uncommitted UI/UX audit work, including removal of the four guide documents, is committed as the baseline; work is tracked in a new Plane project EKM holding the seven SDLC phases and three owner gates; detailed build tickets are written in the Plan phase."
