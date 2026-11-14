@@ -1,0 +1,26 @@
+sequenceDiagram
+  actor T as Tenant
+  actor S as Staff
+  participant A as Django
+  participant D as Database
+  participant M as Media volume
+  T->>A: upload proof for invoice X (JPG/PNG, max 5 MB)
+  A->>A: invoice X belongs to the session's contract
+  A->>D: lock invoice X, status must be BELUM_LUNAS or TELAT_BAYAR
+  A->>M: store file under random name
+  A->>D: insert Payment PENDING, invoice -> MENUNGGU_VERIFIKASI
+  A-->>T: "Bukti diterima, menunggu diperiksa"
+  S->>A: open invoice X detail (same location only)
+  A-->>S: proof image, amounts, approve / reject
+  alt approve
+    S->>A: POST approve
+    A->>D: lock invoice then payment, both still pending
+    A->>D: payment APPROVED, verified_at = now, invoice LUNAS
+  else reject with reason
+    S->>A: POST reject + reason (required)
+    A->>D: lock invoice then payment
+    A->>D: payment REJECTED with reason, invoice BELUM_LUNAS or TELAT_BAYAR by due date
+  end
+  A->>D: audit log entry
+  T->>A: open Tagihan Anda
+  A-->>T: status, and the rejection reason if rejected

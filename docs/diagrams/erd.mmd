@@ -1,0 +1,107 @@
+erDiagram
+  KOST_LOCATION ||--o{ ROOM : has
+  KOST_LOCATION ||--o{ OPERATION_COST : spends
+  KOST_LOCATION ||--o{ ADMIN_PROFILE : "staffed by"
+  USER ||--o| ADMIN_PROFILE : has
+  USER ||--o| TOTP_DEVICE : "signs in with"
+  ROOM ||--o{ TENANT_CONTRACT : "rented through"
+  TENANT ||--o{ TENANT_CONTRACT : signs
+  TENANT_CONTRACT ||--o{ INVOICE : owes
+  TENANT_CONTRACT ||--o{ MAINTENANCE_TICKET : reports
+  INVOICE ||--o| ELECTRICITY_READING : "metered by"
+  INVOICE ||--o{ PAYMENT : "paid through"
+  USER ||--o{ PAYMENT : verifies
+
+  KOST_LOCATION {
+    int id PK
+    string name
+    decimal electricity_rate_per_kwh
+    string billing_mode "new: per_room_cycle or simultaneous"
+    bool bills_electricity "new"
+    string bank_name "new"
+    string bank_account_number "new"
+    string bank_account_holder "new"
+  }
+  ROOM {
+    int id PK
+    int kost_location_id FK
+    string room_number
+    decimal price_monthly
+    bool is_token_electricity
+  }
+  TENANT {
+    int id PK
+    string full_name "personal data"
+    string phone_number "personal data"
+    string emergency_contact_phone "personal data"
+    image ktp_photo "personal data, sensitive"
+  }
+  TENANT_CONTRACT {
+    int id PK
+    int tenant_id FK
+    int room_id FK
+    date start_date "per_room_cycle: cycle day"
+    date end_date
+    decimal monthly_rent_amount
+    string payment_pin "secret, unique"
+    bool is_active "one active per room and per tenant"
+  }
+  INVOICE {
+    int id PK
+    int contract_id FK
+    date billing_period_start
+    date due_date
+    decimal base_rent_amount
+    decimal electricity_bill_amount
+    decimal total_amount
+    string status
+  }
+  ELECTRICITY_READING {
+    int id PK
+    int invoice_id FK
+    int meter_reading_start
+    int meter_reading_end
+    decimal rate_per_kwh
+    decimal calculated_amount
+  }
+  PAYMENT {
+    int id PK
+    int invoice_id FK
+    image payment_proof_file "personal data"
+    datetime uploaded_at
+    string status "PENDING, APPROVED, REJECTED"
+    int verified_by_id FK
+    datetime verified_at "income date"
+    text rejection_note "required when REJECTED"
+  }
+  OPERATION_COST {
+    int id PK
+    int kost_location_id FK
+    string category
+    decimal amount
+    date incurred_date
+    image proof_file
+  }
+  MAINTENANCE_TICKET {
+    int id PK
+    int contract_id FK
+    string title
+    string status
+    image photo
+  }
+  ADMIN_PROFILE {
+    int id PK
+    int user_id FK
+    int assigned_location_id FK
+  }
+  USER {
+    int id PK
+    string username
+    bool is_superuser "Owner"
+  }
+  TOTP_DEVICE {
+    int id PK
+    int user_id FK
+    string key "secret"
+    bool confirmed
+  }

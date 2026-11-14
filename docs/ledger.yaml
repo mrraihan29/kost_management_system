@@ -6,7 +6,8 @@ test_globs:
   - "tests_simulation.py"
   - "tests_postgres_concurrency.py"
   - "**/tests.py"
-  - "e2e/**/*.spec.ts"
+  - "e2e/**/test_*.py"
+  - "**/tests/test_*.py"
 entries:
   - id: R-001
     type: requirement
@@ -470,15 +471,16 @@ entries:
 
   - id: R-031
     type: requirement
-    version: 1
+    version: 2
     status: active
     topic: 7
     answer: "setuju semua"
     recommendation: "Owner wajib memakai kode dari aplikasi authenticator saat login; Staff tidak wajib."
-    statement: "The Owner must pass a TOTP authenticator code at sign-in; it is optional for Staff unless ASVS 5.0 Level 2 is found in Design to require it."
+    statement: "Owner and Staff must pass a TOTP authenticator code at sign-in. Version 2: Design found that ASVS 5.0 Level 2 (V6.3.3) requires multi-factor authentication to access the application, which the version 1 statement made the condition for including Staff."
     acceptance:
-      - "An Owner sign-in without a valid TOTP code is refused"
-      - "Staff can sign in with password only"
+      - "An Owner or Staff sign-in without a valid TOTP code is refused"
+      - "A TOTP code is accepted only once"
+      - "A password reset does not bypass TOTP"
 
   - id: R-032
     type: requirement
@@ -501,3 +503,40 @@ entries:
     answer: "setuju semua"
     recommendation: "Pekerjaan audit UI/UX yang belum di-commit di-commit dulu, termasuk penghapusan empat file panduan. Project Plane baru bernama \"Evy Kost Management\" dengan kode EKM, berisi tujuh fase SDLC berurutan beserta tiga gerbang persetujuan. Tiket pengerjaan rinci ditulis di fase Plan."
     statement: "The uncommitted UI/UX audit work, including removal of the four guide documents, is committed as the baseline; work is tracked in a new Plane project EKM holding the seven SDLC phases and three owner gates; detailed build tickets are written in the Plan phase."
+
+  # --- Design phase (2026-11-14) ---
+  - id: D-012
+    type: decision
+    version: 1
+    status: active
+    topic: 10
+    answer: "Setuju, lanjut"
+    recommendation: "Mockup beranda Staff dan tagihan Penghuni dalam arah Plat Nomor disetujui."
+    statement: "The Staff home and Tenant invoices mockups in docs/design/mockups/ are approved as the reference for the Plat Nomor design system."
+
+  - id: D-013
+    type: decision
+    version: 1
+    status: active
+    topic: 4
+    answer: "setuju semua"
+    recommendation: "Owner mengatur dua hal per lokasi: mode tagihan (per kamar atau serentak) dan apakah listrik ditagih lewat website."
+    statement: "Billing mode and electricity billing are stored per location and read by one billing service; location names carry no behaviour (ADR 0002)."
+
+  - id: D-014
+    type: decision
+    version: 1
+    status: active
+    topic: 12
+    answer: "autonomous default"
+    recommendation: "Browser tests use Playwright for Python (pytest-playwright with axe-playwright-python) in e2e/test_*.py, named with the ledger id, instead of Playwright in TypeScript, because the project has no Node toolchain (ADR 0004). Confirmed at Gate 1."
+    statement: "End-to-end tests run on pytest-playwright with an axe check, live in e2e/test_*.py and carry the ledger id in the test name."
+
+  - id: D-015
+    type: decision
+    version: 1
+    status: active
+    topic: 7
+    answer: "autonomous default"
+    recommendation: "TOTP uses django-otp, the maintained Django package for one-time-password devices, rather than hand-written TOTP code. Confirmed at Gate 1."
+    statement: "TOTP sign-in for Owner and Staff is implemented with django-otp."

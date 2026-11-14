@@ -1,0 +1,21 @@
+C4Container
+  title Containers: EKM on Coolify
+  Person(user, "Owner, Staff or Tenant")
+  System_Boundary(vps, "Hostinger VPS, Coolify") {
+    Container(proxy, "Traefik", "Coolify proxy", "HTTPS, certificates")
+    Container(web, "Web app", "Django 6.1, Gunicorn", "Pages, business rules, admin")
+    Container(jobs, "Scheduled jobs", "Django management commands", "Issue per-room invoices, mark late, retention; daily 00:05 WIB")
+    ContainerDb(db, "Database", "PostgreSQL 15+", "Locations, rooms, tenants, contracts, invoices, payments, costs, tickets, sessions, rate-limit cache")
+    Container(media, "Media volume", "Persistent volume", "ID-card photos, proofs, ticket and cost photos")
+  }
+  System_Ext(b2, "Backblaze B2", "Backups")
+  System_Ext(sentry, "Sentry", "Errors")
+  Rel(user, proxy, "Uses", "HTTPS")
+  Rel(proxy, web, "Forwards", "HTTP")
+  Rel(web, db, "Reads/writes", "SQL")
+  Rel(web, media, "Reads/writes files")
+  Rel(jobs, db, "Reads/writes", "SQL")
+  Rel(jobs, media, "Deletes expired files")
+  Rel(web, sentry, "Errors", "HTTPS")
+  Rel(db, b2, "Daily backup", "S3 API")
+  Rel(media, b2, "Daily backup", "S3 API")

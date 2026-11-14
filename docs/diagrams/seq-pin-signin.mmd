@@ -1,0 +1,22 @@
+sequenceDiagram
+  actor T as Tenant
+  participant P as Tenant portal
+  participant A as Django
+  participant C as Rate-limit cache
+  participant D as Database
+  T->>P: location, room number, PIN
+  P->>A: POST /bayar/
+  A->>C: attempts for this IP
+  alt 5 failures in 15 minutes
+    A-->>P: blocked, retry after N minutes
+  else allowed
+    A->>D: active contract for room with this PIN
+    alt no match
+      A->>C: record failure
+      A-->>P: "Lokasi, nomor kamar atau PIN salah"
+    else match
+      A->>C: reset counter
+      A->>A: rotate session id, store contract id, expire in 30 minutes
+      A-->>P: redirect to Tagihan Anda
+    end
+  end

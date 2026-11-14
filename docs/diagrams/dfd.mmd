@@ -1,0 +1,43 @@
+flowchart LR
+  tenant([Tenant]):::ext
+  staff([Staff]):::ext
+  owner([Owner]):::ext
+  b2([Backblaze B2]):::ext
+
+  subgraph browser[Trust boundary: browser]
+    portal[Tenant portal]
+    staffui[Staff and Owner pages]
+  end
+
+  subgraph server[Trust boundary: application server]
+    pin[P1 PIN sign-in]
+    auth[P2 Password + TOTP sign-in]
+    billing[P3 Billing service]
+    pay[P4 Proof upload and verification]
+    scope[P5 Location scoping]
+    jobs[P6 Scheduled jobs]
+    db[(D1 Database)]
+    media[(D2 Media files)]
+    log[(D3 Audit log)]
+  end
+
+  tenant -->|location, room, PIN| portal
+  portal -->|"POST PIN"| pin
+  pin -->|session with contract id| portal
+  portal -->|"proof image"| pay
+  pay -->|stored file| media
+  pay -->|payment, invoice status| db
+  staff -->|credentials, TOTP| staffui
+  owner -->|credentials, TOTP| staffui
+  staffui -->|"POST login"| auth
+  staffui -->|"approve / reject, meter, issue"| scope
+  scope --> pay
+  scope --> billing
+  billing -->|invoices| db
+  jobs --> billing
+  jobs -->|expired ID photos| media
+  pay -->|decision| log
+  auth -->|sign-in events| log
+  db -->|daily backup| b2
+  media -->|daily backup| b2
+  classDef ext stroke-dasharray: 4 2
