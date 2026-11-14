@@ -427,12 +427,12 @@ entries:
 
   - id: D-009
     type: decision
-    version: 1
-    status: deferred
+    version: 2
+    status: active
     topic: 8
-    answer: "setuju semua, tapi mau tanya apakah boostrap bisa membuat tampilan sangat modern dan bagus untuk component nya? atau lebih mending tailwind ataupun library lain?"
-    statement: "The CSS framework (themed Bootstrap or Tailwind CSS) is chosen from mockups of the same screens."
-    prototype_question: "Built as mockups of the Staff home page and the Tenant invoice page, does Tailwind CSS (standalone CLI, no Node) give a visibly more modern result than themed Bootstrap for comparable effort, and which does the owner pick?"
+    answer: "Oke gunakan tailwind! Untuk UI pastikan gunakan skill /frontend-design:frontend-design /impeccable"
+    recommendation: "Tailwind CSS: tidak membawa tampilan bawaan, jadi hasilnya mengikuti desain kita; build step lewat satu file CLI tanpa Node; komponen disusun sebagai potongan template."
+    statement: "The CSS framework is Tailwind CSS, replacing Bootstrap; UI work follows the frontend-design and impeccable skills."
 
   - id: D-010
     type: decision
