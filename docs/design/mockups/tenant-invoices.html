@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tagihan Anda · EKM</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-enamel: #17409C;
+  --color-enamel-deep: #10307A;
+  --color-porcelain: #F4F6F3;
+  --color-ink: #16212E;
+  --color-ink-soft: #586472;
+  --color-rule: #DDE2DD;
+  --color-paid: #0F7A47;
+  --color-wait: #E9A100;
+  --color-late: #C8281E;
+}
+</style>
+<style>
+  ::selection { background: #17409C; color: #fff; }
+  :focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; border-radius: 6px; }
+  .plate {
+    position: relative; display: grid; place-items: center; flex: none; aspect-ratio: 1;
+    border-radius: 10px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: var(--glaze); box-shadow: inset 0 0 0 3px var(--glaze), inset 0 0 0 5px rgba(255,255,255,.88);
+  }
+  .plate .mark { position: absolute; top: 9%; right: 9%; width: 26%; height: 26%; }
+  .g-paid { --glaze: #0F7A47; } .g-late { --glaze: #C8281E; } .g-enamel { --glaze: #17409C; }
+  .g-wait { --glaze: #E9A100; color: #231A00; box-shadow: inset 0 0 0 3px #E9A100, inset 0 0 0 5px rgba(35,26,0,.5); }
+</style>
+</head>
+<body class="bg-porcelain text-ink font-sans antialiased">
+
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <symbol id="m-paid" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="m-wait" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="m-late" viewBox="0 0 16 16"><path d="M8 2.5v7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="8" cy="13" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M10 13V3m0 0L6 7m4-4l4 4M3 13v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="mx-auto max-w-xl pb-10">
+
+  <header class="m-3 flex items-center gap-4 rounded-2xl bg-enamel p-4 text-white shadow-[inset_0_0_0_6px_#17409C,inset_0_0_0_8px_rgba(255,255,255,.85)] sm:mx-0 sm:mt-6">
+    <div class="plate g-enamel w-16 text-3xl shadow-[inset_0_0_0_2px_rgba(255,255,255,.88)]">12</div>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm text-white/85">Kost Ancol, kamar 12</p>
+      <h1 class="text-2xl font-extrabold leading-tight">Halo, Rina</h1>
+    </div>
+    <a href="#" class="self-start rounded-lg px-3 py-2 text-sm font-semibold text-white/90 underline underline-offset-4 hover:text-white">Keluar</a>
+  </header>
+
+  <main class="px-4 sm:px-0">
+    <p class="mt-6 text-lg font-bold">Anda punya 2 tagihan belum lunas</p>
+    <p class="text-ink-soft">Bayar dari yang paling lama. Setiap tagihan diunggah buktinya sendiri.</p>
+
+    <!-- Oldest first: late, with rejected proof -->
+    <article class="mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_1px_0_#DDE2DD,0_8px_24px_-12px_rgba(22,33,46,.18)]" aria-labelledby="inv-okt">
+      <div class="flex items-start gap-3 p-4">
+        <div class="plate g-late w-12 text-[13px]" aria-hidden="true">OKT<svg class="mark"><use href="#m-late"/></svg></div>
+        <div class="min-w-0 flex-1">
+          <h2 id="inv-okt" class="font-bold">Tagihan Oktober 2026</h2>
+          <p class="text-sm font-semibold text-late">Telat, jatuh tempo 20 Oktober</p>
+        </div>
+        <p class="text-right text-xl font-extrabold tabular-nums">Rp 1.820.000</p>
+      </div>
+
+      <div class="mx-4 rounded-xl bg-[#FBEAE8] p-3 text-sm">
+        <p class="font-bold text-[#8E1C15]">Bukti 3 November ditolak</p>
+        <p class="mt-0.5 text-[#5C1A15]">Alasan dari staff: nominal transfer Rp 1.770.000, kurang Rp 50.000. Transfer kekurangannya lalu unggah kedua bukti dalam satu gambar.</p>
+      </div>
+
+      <dl class="mx-4 mt-3 grid grid-cols-[1fr_auto] gap-y-1.5 border-t border-dashed border-rule pt-3 text-sm tabular-nums">
+        <dt class="text-ink-soft">Sewa 10 Okt sampai 9 Nov</dt><dd>Rp 1.600.000</dd>
+        <dt class="text-ink-soft">Listrik 110 kWh × Rp 2.000</dt><dd>Rp 220.000</dd>
+      </dl>
+
+      <label class="m-4 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-enamel px-4 font-bold text-white hover:bg-enamel-deep focus-within:outline-3 focus-within:outline-wait">
+        <svg class="h-5 w-5" aria-hidden="true"><use href="#i-upload"/></svg>
+        Unggah bukti transfer Oktober
+        <input type="file" accept="image/jpeg,image/png" class="sr-only">
+      </label>
+    </article>
+
+    <!-- Current invoice -->
+    <article class="mt-4 overflow-hidden rounded-2xl bg-white shadow-[0_1px_0_#DDE2DD,0_8px_24px_-12px_rgba(22,33,46,.18)]" aria-labelledby="inv-nov">
+      <div class="flex items-start gap-3 p-4">
+        <div class="plate w-12 bg-white text-[13px] !text-ink !shadow-[inset_0_0_0_2px_#AEB7C0]" aria-hidden="true">NOV</div>
+        <div class="min-w-0 flex-1">
+          <h2 id="inv-nov" class="font-bold">Tagihan November 2026</h2>
+          <p class="text-sm text-ink-soft">Belum dibayar, jatuh tempo 20 November</p>
+        </div>
+        <p class="text-right text-xl font-extrabold tabular-nums">Rp 1.850.000</p>
+      </div>
+      <dl class="mx-4 grid grid-cols-[1fr_auto] gap-y-1.5 border-t border-dashed border-rule pt-3 text-sm tabular-nums">
+        <dt class="text-ink-soft">Sewa 10 Nov sampai 9 Des</dt><dd>Rp 1.600.000</dd>
+        <dt class="text-ink-soft">Listrik 125 kWh × Rp 2.000</dt><dd>Rp 250.000</dd>
+      </dl>
+      <label class="m-4 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-enamel shadow-[inset_0_0_0_2px_#17409C] hover:bg-porcelain">
+        <svg class="h-5 w-5" aria-hidden="true"><use href="#i-upload"/></svg>
+        Unggah bukti transfer November
+        <input type="file" accept="image/jpeg,image/png" class="sr-only">
+      </label>
+    </article>
+
+    <!-- Where to transfer -->
+    <section class="mt-6 rounded-2xl border-2 border-enamel bg-white p-4" aria-labelledby="bank">
+      <h2 id="bank" class="font-bold">Transfer ke rekening ini</h2>
+      <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt class="text-ink-soft">Bank</dt><dd class="font-semibold">BCA</dd>
+        <dt class="text-ink-soft">Atas nama</dt><dd class="font-semibold">Evy Kost Management</dd>
+      </dl>
+      <div class="mt-3 flex items-center justify-between gap-3 rounded-xl bg-porcelain px-4 py-3">
+        <p class="text-2xl font-extrabold tracking-wide tabular-nums">123 456 7890</p>
+        <button type="button" class="flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-bold text-enamel hover:bg-white">
+          <svg class="h-5 w-5" aria-hidden="true"><use href="#i-copy"/></svg>Salin
+        </button>
+      </div>
+      <p class="mt-3 text-sm text-ink-soft">Transfer tepat sesuai nominal tagihan. Unggah foto atau tangkapan layar bukti transfer, JPG atau PNG, maksimal 5 MB.</p>
+    </section>
+
+    <!-- Paid this year -->
+    <section class="mt-8" aria-labelledby="hist">
+      <div class="flex items-baseline justify-between">
+        <h2 id="hist" class="font-bold">Sudah lunas</h2>
+        <a href="#" class="text-sm font-semibold text-enamel underline underline-offset-4">Semua riwayat</a>
+      </div>
+      <ul class="mt-2 divide-y divide-rule border-y border-rule">
+        <li class="flex items-center gap-3 py-3"><div class="plate g-paid w-9 text-xs" aria-hidden="true">SEP<svg class="mark"><use href="#m-paid"/></svg></div><p>September 2026</p><p class="ml-auto text-sm tabular-nums text-ink-soft">Rp 1.790.000</p></li>
+        <li class="flex items-center gap-3 py-3"><div class="plate g-paid w-9 text-xs" aria-hidden="true">AGU<svg class="mark"><use href="#m-paid"/></svg></div><p>Agustus 2026</p><p class="ml-auto text-sm tabular-nums text-ink-soft">Rp 1.840.000</p></li>
+      </ul>
+    </section>
+
+    <a href="#" class="mt-6 flex min-h-12 items-center justify-between rounded-xl bg-white px-4 font-semibold shadow-[0_1px_0_#DDE2DD]">
+      Lapor kerusakan
+      <span class="text-sm font-normal text-ink-soft">1 sedang diproses</span>
+    </a>
+
+    <p class="mt-8 text-xs leading-relaxed text-ink-soft">
+      Privasi: EKM menyimpan nama, nomor HP, kontak darurat, dan foto KTP Anda untuk menjalankan kontrak sewa. Foto KTP dihapus 30 hari setelah Anda keluar; data tagihan disimpan 5 tahun untuk pembukuan. Minta perbaikan atau penghapusan data lewat staff kost.
+    </p>
+    <p class="mt-2 text-xs text-ink-soft">Data pada halaman ini adalah contoh.</p>
+  </main>
+</div>
+</body>
+</html>

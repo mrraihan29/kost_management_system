@@ -144,12 +144,12 @@ entries:
 
   - id: D-004
     type: decision
-    version: 1
-    status: deferred
+    version: 2
+    status: active
     topic: 10
-    answer: "UI UX kita akan redesign deh, biar lebih minimalis namun tetap professional"
-    statement: "The UI is fully redesigned to a minimalist yet professional visual direction, chosen by the owner from mockups."
-    prototype_question: "Which of the mockup directions for the Staff dashboard and Tenant portal reads as minimalist yet professional to the owner, and are the current logo and indigo colour kept?"
+    answer: "Plat Nomor (owner selected the assigned card on the Impeccable decision page on 2026-11-14; earlier: 'Logo aku akan melakukan redesign penuh! Sekarang kamu bebas menggunakan warna apapun nanti logo ku akan mengikuti redesign mu')"
+    recommendation: "Plat Nomor: setiap kamar adalah plat nomor enamel, dan warna platnya adalah status tagihannya."
+    statement: "The visual direction is Plat Nomor: enamel blue shell, porcelain ground, and every room shown as an enamel number plate whose glaze is its invoice state (paid, awaiting verification, late, meter needed, empty), each glaze with a drawn mark. The logo follows this direction; the old indigo and the current logo are not binding."
 
   - id: R-010
     type: requirement
