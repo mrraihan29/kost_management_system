@@ -11,38 +11,48 @@ from tenants.models import TenantContract
 
 # --- Fungsi Utilitas Upload Path (Security NFR-02) ---
 
+
 def payment_proof_upload_path(instance, filename):
-    ext = filename.split('.')[-1]
+    ext = filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     # Simpan di: media/payment_proofs/UUID.jpg
-    return os.path.join('payment_proofs', filename)
+    return os.path.join("payment_proofs", filename)
+
 
 def operation_cost_upload_path(instance, filename):
-    ext = filename.split('.')[-1]
+    ext = filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     # Simpan di: media/operation_costs/UUID.jpg
-    return os.path.join('operation_costs', filename)
+    return os.path.join("operation_costs", filename)
+
 
 # --- Model Inti Keuangan ---
+
 
 class Invoice(models.Model):
     # Mengambil Status dari State Diagram (Phase 2)
     STATUS_CHOICES = [
-        ('BELUM_LUNAS', 'Belum Lunas'),
-        ('MENUNGGU_VERIFIKASI', 'Menunggu Verifikasi'),
-        ('LUNAS', 'Lunas'),
-        ('TELAT_BAYAR', 'Telat Bayar'),
+        ("BELUM_LUNAS", "Belum Lunas"),
+        ("MENUNGGU_VERIFIKASI", "Menunggu Verifikasi"),
+        ("LUNAS", "Lunas"),
+        ("TELAT_BAYAR", "Telat Bayar"),
     ]
 
-    contract = models.ForeignKey(TenantContract, on_delete=models.CASCADE, related_name='invoices')
+    contract = models.ForeignKey(TenantContract, on_delete=models.CASCADE, related_name="invoices")
     billing_period_start = models.DateField(db_index=True)
-    due_date = models.DateField(help_text="Jatuh tempo default: +10 hari dari tanggal tagihan", db_index=True)
-    
+    due_date = models.DateField(
+        help_text="Jatuh tempo default: +10 hari dari tanggal tagihan", db_index=True
+    )
+
     base_rent_amount = models.DecimalField(max_digits=12, decimal_places=2)
-    electricity_bill_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BELUM_LUNAS', db_index=True)
-    
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, editable=False) 
+    electricity_bill_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0")
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="BELUM_LUNAS", db_index=True
+    )
+
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, editable=False)
 
     # W4/BQ-6: periode tagihan ternormalisasi — sumber tunggal untuk idempotensi + constraint unik
     billing_period_year = models.PositiveSmallIntegerField(editable=False)
@@ -51,11 +61,11 @@ class Invoice(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=['contract', 'billing_period_year', 'billing_period_month'],
-                name='uniq_invoice_contract_period',
+                fields=["contract", "billing_period_year", "billing_period_month"],
+                name="uniq_invoice_contract_period",
             )
         ]
-    
+
     def __str__(self):
         return f"Tagihan {self.contract.tenant.full_name} ({self.billing_period_start})"
 
@@ -68,9 +78,12 @@ class Invoice(models.Model):
             self.billing_period_month = self.billing_period_start.month
         super().save(*args, **kwargs)
 
+
 class ElectricityReading(models.Model):
     # Relasi 1-to-1: 1 Tagihan = 1 Catatan Listrik (Sesuai ERD)
-    invoice = models.OneToOneField(Invoice, on_delete=models.CASCADE, related_name='electricity_reading')
+    invoice = models.OneToOneField(
+        Invoice, on_delete=models.CASCADE, related_name="electricity_reading"
+    )
     meter_reading_start = models.IntegerField()
     meter_reading_end = models.IntegerField()
     rate_per_kwh = models.DecimalField(max_digits=10, decimal_places=2)
@@ -88,7 +101,7 @@ class ElectricityReading(models.Model):
             invoice = None
             if self.invoice_id:
                 invoice = Invoice.objects.select_for_update().get(pk=self.invoice_id)
-                if invoice.status in ('LUNAS', 'MENUNGGU_VERIFIKASI'):
+                if invoice.status in ("LUNAS", "MENUNGGU_VERIFIKASI"):
                     raise ValidationError(
                         "Nilai listrik tidak dapat diubah pada tagihan yang sudah dibayar atau menunggu verifikasi."
                     )
@@ -113,25 +126,25 @@ class ElectricityReading(models.Model):
                 # Caller-side objects are intentionally NOT mutated: the DB row is
                 # the source of truth; callers must refresh if they re-read values.
 
+
 class Payment(models.Model):
     STATUS_CHOICES = [
-        ('PENDING', 'Menunggu Keputusan'),
-        ('APPROVED', 'Disetujui'),
-        ('REJECTED', 'Ditolak'),
+        ("PENDING", "Menunggu Keputusan"),
+        ("APPROVED", "Disetujui"),
+        ("REJECTED", "Ditolak"),
     ]
 
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="payments")
     payment_proof_file = models.ImageField(upload_to=payment_proof_upload_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     # W1/BQ-8: keputusan verifikasi bersifat final per Payment (rejected tidak bisa di-approve ulang)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', db_index=True)
-    
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="PENDING", db_index=True
+    )
+
     # Siapa admin yang memverifikasi? (Sesuai ERD)
     verified_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
     verified_at = models.DateTimeField(null=True, blank=True)
     rejection_note = models.TextField(blank=True, null=True)  # noqa: DJ001 schema change deferred to EKM-27 (reason becomes required)
@@ -139,18 +152,19 @@ class Payment(models.Model):
     def __str__(self):
         return f"Pembayaran untuk Tagihan #{self.invoice.id}"
 
+
 class OperationCost(models.Model):
     CATEGORY_CHOICES = [
-        ('LISTRIK', 'Listrik'),
-        ('PAM', 'PAM (Air)'),
-        ('INTERNET', 'Internet'),
-        ('MAINTENANCE', 'Maintenance'),
-        ('LAINNYA', 'Lainnya'),
+        ("LISTRIK", "Listrik"),
+        ("PAM", "PAM (Air)"),
+        ("INTERNET", "Internet"),
+        ("MAINTENANCE", "Maintenance"),
+        ("LAINNYA", "Lainnya"),
     ]
 
-    kost_location = models.ForeignKey(KostLocation, on_delete=models.PROTECT, related_name='costs')
+    kost_location = models.ForeignKey(KostLocation, on_delete=models.PROTECT, related_name="costs")
     admin = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-    
+
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.TextField()

@@ -27,32 +27,35 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Production:  set environment variable di server/Coolify
 # Generate:    python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
 if DEBUG:
     # Development saja — key ini TIDAK boleh dipakai di production
     SECRET_KEY = os.environ.get(
-        'DJANGO_SECRET_KEY',
-        'dev-only-insecure-key-do-not-use-in-production'
+        "DJANGO_SECRET_KEY", "dev-only-insecure-key-do-not-use-in-production"
     )
 else:
-    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+    SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
     if not SECRET_KEY:
         raise ValueError(
             "FATAL: DJANGO_SECRET_KEY environment variable WAJIB di-set di production! "
-            "Generate dengan: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+            'Generate dengan: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
         )
 
 # Allowed Hosts
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # CSRF Trusted Origins (hanya domain yang terdaftar)
-_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.web.id,https://*.coolify.io')
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+_csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "https://*.web.id,https://*.coolify.io")
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(",") if o.strip()]
 
 # W7: X-Forwarded-For hanya dipercaya bila deployment berada di belakang
 # reverse proxy terpercaya. Default False = pakai REMOTE_ADDR (anti-spoof).
-TRUST_X_FORWARDED_FOR = os.environ.get('TRUST_X_FORWARDED_FOR', 'False').lower() in ('true', '1', 'yes')
+TRUST_X_FORWARDED_FOR = os.environ.get("TRUST_X_FORWARDED_FOR", "False").lower() in (
+    "true",
+    "1",
+    "yes",
+)
 
 
 # ──────────────────────────────────────────────
@@ -60,54 +63,54 @@ TRUST_X_FORWARDED_FOR = os.environ.get('TRUST_X_FORWARDED_FOR', 'False').lower()
 # ──────────────────────────────────────────────
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Third-party
-    'axes',                    # SEC-11: Login rate limiting
+    "axes",  # SEC-11: Login rate limiting
     # Project apps
-    'users',
-    'core',
-    'tenants',
-    'finance',
-    'django.contrib.humanize',
+    "users",
+    "core",
+    "tenants",
+    "finance",
+    "django.contrib.humanize",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'csp.middleware.CSPMiddleware',  # SEC-14: Content Security Policy
-    'axes.middleware.AxesMiddleware',  # SEC-11: Login rate limiting (harus setelah auth)
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "csp.middleware.CSPMiddleware",  # SEC-14: Content Security Policy
+    "axes.middleware.AxesMiddleware",  # SEC-11: Login rate limiting (harus setelah auth)
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # ──────────────────────────────────────────────
@@ -115,15 +118,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # ──────────────────────────────────────────────
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    DATABASES["default"] = dj_database_url.parse(DATABASE_URL)
 
 
 # ──────────────────────────────────────────────
@@ -131,35 +134,37 @@ if DATABASE_URL:
 # ──────────────────────────────────────────────
 
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',  # Default Django auth
+    "django.contrib.auth.backends.ModelBackend",  # Default Django auth
     # AxesMiddleware menangani rate limiting di level view/middleware,
     # tidak perlu AxesStandaloneBackend di sini (kompatibilitas test client).
 ]
 
 # Konfigurasi Axes
-AXES_FAILURE_LIMIT = 5           # Blokir setelah 5x gagal login
-AXES_COOLOFF_TIME = 0.25         # Durasi blokir: 15 menit (0.25 jam)
+AXES_FAILURE_LIMIT = 5  # Blokir setelah 5x gagal login
+AXES_COOLOFF_TIME = 0.25  # Durasi blokir: 15 menit (0.25 jam)
 AXES_LOCK_OUT_AT_FAILURE = True
-AXES_RESET_ON_SUCCESS = True     # Reset counter setelah login sukses
-AXES_LOCKOUT_PARAMETERS = [['ip_address', 'username']]  # Lock per IP + username
+AXES_RESET_ON_SUCCESS = True  # Reset counter setelah login sukses
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]  # Lock per IP + username
 
 # Template custom saat terkunci
-AXES_LOCKOUT_TEMPLATE = None     # Menggunakan default 403 (django menangani)
-AXES_VERBOSE = not DEBUG         # Log detail hanya di production
+AXES_LOCKOUT_TEMPLATE = None  # Menggunakan default 403 (django menangani)
+AXES_VERBOSE = not DEBUG  # Log detail hanya di production
 
 # Silence axes.W003: kita sengaja pakai middleware-only approach
-SILENCED_SYSTEM_CHECKS = ['axes.W003']
+SILENCED_SYSTEM_CHECKS = ["axes.W003"]
 
 # ──────────────────────────────────────────────
 # Password validation (Existing + enhanced)
 # ──────────────────────────────────────────────
 
 AUTH_PASSWORD_VALIDATORS = [
-    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-     'OPTIONS': {'min_length': 10}},  # Minimum 10 karakter (dari default 8)
-    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 10},
+    },  # Minimum 10 karakter (dari default 8)
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
@@ -167,8 +172,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # ──────────────────────────────────────────────
 
-LANGUAGE_CODE = 'id'
-TIME_ZONE = 'Asia/Jakarta'
+LANGUAGE_CODE = "id"
+TIME_ZONE = "Asia/Jakarta"
 USE_I18N = True
 USE_TZ = True
 
@@ -177,25 +182,25 @@ USE_TZ = True
 # Static files
 # ──────────────────────────────────────────────
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-AUTH_USER_MODEL = 'users.User'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "users.User"
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media Files (Upload User: KTP, Bukti Bayar)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Auth URLs
-LOGIN_REDIRECT_URL = '/staff/dashboard/'
-LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = "/staff/dashboard/"
+LOGIN_URL = "/accounts/login/"
 
 # Bootstrap 5 has no alert-error class; map Django's ERROR level to danger.
 MESSAGE_TAGS = {
-    messages.ERROR: 'danger',
+    messages.ERROR: "danger",
 }
 
 
@@ -203,10 +208,10 @@ MESSAGE_TAGS = {
 # SEC-10: Session Hardening
 # ──────────────────────────────────────────────
 
-SESSION_COOKIE_AGE = 3600             # 1 jam (bukan default 2 minggu)
-SESSION_SAVE_EVERY_REQUEST = True     # Reset timer setiap request (idle timeout)
-SESSION_COOKIE_HTTPONLY = True        # Cegah akses cookie via JavaScript
-SESSION_COOKIE_SAMESITE = 'Lax'      # Cegah CSRF via third-party request
+SESSION_COOKIE_AGE = 3600  # 1 jam (bukan default 2 minggu)
+SESSION_SAVE_EVERY_REQUEST = True  # Reset timer setiap request (idle timeout)
+SESSION_COOKIE_HTTPONLY = True  # Cegah akses cookie via JavaScript
+SESSION_COOKIE_SAMESITE = "Lax"  # Cegah CSRF via third-party request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Tetap gunakan timer-based expiry
 
 
@@ -215,22 +220,22 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Tetap gunakan timer-based expiry
 # ──────────────────────────────────────────────
 # Otomatis aktif saat DEBUG=False (production)
 
-SECURE_CONTENT_TYPE_NOSNIFF = True    # X-Content-Type-Options: nosniff
-X_FRAME_OPTIONS = 'DENY'             # Keras: deny semua framing (bukan SAMEORIGIN)
+SECURE_CONTENT_TYPE_NOSNIFF = True  # X-Content-Type-Options: nosniff
+X_FRAME_OPTIONS = "DENY"  # Keras: deny semua framing (bukan SAMEORIGIN)
 
 # W3: healthcheck kontainer (http://localhost:8000/health/) tidak boleh kena
 # redirect HTTPS — curl -f menganggap 301 sukses sehingga cek DB tidak pernah jalan.
-SECURE_REDIRECT_EXEMPT = [r'^health/$']
+SECURE_REDIRECT_EXEMPT = [r"^health/$"]
 
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True                # Redirect HTTP → HTTPS
-    SECURE_HSTS_SECONDS = 31536000            # HSTS: 1 tahun
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True     # HSTS untuk subdomain
-    SECURE_HSTS_PRELOAD = True                # Izinkan preload list browser
-    SESSION_COOKIE_SECURE = True              # Cookie hanya via HTTPS
-    CSRF_COOKIE_SECURE = True                 # CSRF token hanya via HTTPS
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Coolify proxy
-    CSRF_COOKIE_HTTPONLY = True               # CSRF cookie tidak bisa diakses JS
+    SECURE_SSL_REDIRECT = True  # Redirect HTTP → HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # HSTS: 1 tahun
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # HSTS untuk subdomain
+    SECURE_HSTS_PRELOAD = True  # Izinkan preload list browser
+    SESSION_COOKIE_SECURE = True  # Cookie hanya via HTTPS
+    CSRF_COOKIE_SECURE = True  # CSRF token hanya via HTTPS
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # Coolify proxy
+    CSRF_COOKIE_HTTPONLY = True  # CSRF cookie tidak bisa diakses JS
 
 
 # ──────────────────────────────────────────────
@@ -244,13 +249,13 @@ CONTENT_SECURITY_POLICY = {
         "script-src": [
             "'self'",
             "cdn.jsdelivr.net",
-            "'unsafe-inline'",       # Diperlukan untuk onclick/onsubmit handlers
+            "'unsafe-inline'",  # Diperlukan untuk onclick/onsubmit handlers
         ],
         "style-src": [
             "'self'",
             "cdn.jsdelivr.net",
             "cdnjs.cloudflare.com",
-            "'unsafe-inline'",       # Bootstrap uses inline styles
+            "'unsafe-inline'",  # Bootstrap uses inline styles
         ],
         "font-src": [
             "'self'",
@@ -258,10 +263,10 @@ CONTENT_SECURITY_POLICY = {
         ],
         "img-src": [
             "'self'",
-            "data:",                 # Untuk inline images/icons
+            "data:",  # Untuk inline images/icons
         ],
         "connect-src": ["'self'"],
-        "frame-ancestors": ["'none'"],   # Setara X-Frame-Options: DENY
+        "frame-ancestors": ["'none'"],  # Setara X-Frame-Options: DENY
         "base-uri": ["'self'"],
         "form-action": ["'self'", "https://wa.me"],  # WhatsApp links
     },
@@ -272,49 +277,49 @@ CONTENT_SECURITY_POLICY = {
 # SEC-12: Audit Logging Configuration
 # ──────────────────────────────────────────────
 
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'security_fmt': {
-            'format': '[{asctime}] {levelname} {name} | {message}',
-            'style': '{',
-            'datefmt': '%Y-%m-%d %H:%M:%S',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "security_fmt": {
+            "format": "[{asctime}] {levelname} {name} | {message}",
+            "style": "{",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     },
-    'handlers': {
-        'security_file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(LOG_DIR, 'security.log'),
-            'maxBytes': 5 * 1024 * 1024,  # 5MB per file
-            'backupCount': 5,             # Simpan 5 file lama
-            'formatter': 'security_fmt',
+    "handlers": {
+        "security_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(LOG_DIR, "security.log"),
+            "maxBytes": 5 * 1024 * 1024,  # 5MB per file
+            "backupCount": 5,  # Simpan 5 file lama
+            "formatter": "security_fmt",
         },
-        'console': {
-            'level': 'WARNING',
-            'class': 'logging.StreamHandler',
-            'formatter': 'security_fmt',
+        "console": {
+            "level": "WARNING",
+            "class": "logging.StreamHandler",
+            "formatter": "security_fmt",
         },
     },
-    'loggers': {
-        'security': {
-            'handlers': ['security_file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
+    "loggers": {
+        "security": {
+            "handlers": ["security_file", "console"],
+            "level": "INFO",
+            "propagate": False,
         },
-        'axes': {
-            'handlers': ['security_file'],
-            'level': 'INFO',
-            'propagate': False,
+        "axes": {
+            "handlers": ["security_file"],
+            "level": "INFO",
+            "propagate": False,
         },
-        'django.security': {
-            'handlers': ['security_file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
+        "django.security": {
+            "handlers": ["security_file", "console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
@@ -325,29 +330,29 @@ LOGGING = {
 # B-04 fix: Gunakan DB cache di production untuk multi-worker support
 # ──────────────────────────────────────────────
 
-_cache_url = os.environ.get('CACHE_URL')  # e.g. redis://127.0.0.1:6379/1
+_cache_url = os.environ.get("CACHE_URL")  # e.g. redis://127.0.0.1:6379/1
 
 if _cache_url:
     # Production: Redis jika tersedia
     CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-            'LOCATION': _cache_url,
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _cache_url,
         }
     }
 elif not DEBUG:
     # Production tanpa Redis: gunakan DB cache (shared antar workers)
     CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-            'LOCATION': 'cache_table',
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "cache_table",
         }
     }
 else:
     # Development: LocMemCache cukup untuk single-process
     CACHES = {
-        'default': {
-            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'ratelimit-cache',
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "ratelimit-cache",
         }
     }

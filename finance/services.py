@@ -9,6 +9,6 @@ def sync_overdue_invoice_statuses(reference_date=None):
         reference_date = timezone.now().date()
 
     return Invoice.objects.filter(
-        status='BELUM_LUNAS',
+        status="BELUM_LUNAS",
         due_date__lt=reference_date,
-    ).update(status='TELAT_BAYAR')
+    ).update(status="TELAT_BAYAR")

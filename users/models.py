@@ -11,16 +11,13 @@ class User(AbstractUser):
     # (username, password, email, first_name, last_name, is_staff, is_superuser)
     pass
 
+
 # 2. Admin Profile (Untuk Admin Kost - Relasi OneToOne)
 class AdminProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='admin_profile')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="admin_profile")
     # Satu admin hanya mengelola satu lokasi (Sesuai Rules FR-01)
     assigned_location = models.ForeignKey(
-        KostLocation, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='admins'
+        KostLocation, on_delete=models.SET_NULL, null=True, blank=True, related_name="admins"
     )
     phone_number = models.CharField(max_length=20, blank=True)
 
