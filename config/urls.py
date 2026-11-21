@@ -6,15 +6,15 @@ Security hardened:
 - SEC-06: Media files served via protected view with authentication
 - SEC-07: Admin panel URL obscured
 """
+import logging
+
 from django.contrib import admin
-from django.urls import path, include, re_path
-from django.conf import settings
 from django.contrib.auth import views as auth_views
 from django.http import JsonResponse
-from core.views import home
-from config.security import serve_protected_media
+from django.urls import include, path, re_path
 
-import logging
+from config.security import serve_protected_media
+from core.views import home
 
 security_logger = logging.getLogger('security')
 

@@ -435,11 +435,11 @@ class PostgresConcurrencyTests(TransactionTestCase):
             payment = self._payment(invoice)
             results = {}
 
-            def approve(barrier=barrier):
+            def approve(barrier=barrier, payment=payment):
                 barrier.wait(timeout=10)
                 return self._staff_client().post(reverse('verify_payment', args=[payment.pk, 'approve']))
 
-            def reject(barrier=barrier):
+            def reject(barrier=barrier, payment=payment, round_index=round_index):
                 barrier.wait(timeout=10)
                 return self._staff_client().post(
                     reverse('verify_payment', args=[payment.pk, 'reject']),

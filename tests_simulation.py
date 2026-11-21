@@ -10,30 +10,29 @@ Run: python manage.py test tests_simulation --verbosity=2
 =============================================================================
 """
 
-import os
-import io
 import calendar
+import io
 import tempfile
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest import mock
 
 from django.conf import settings
-from django.test import TestCase, Client, RequestFactory, override_settings
-from django.urls import reverse
-from django.utils import timezone
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import IntegrityError
 from django.db.models.query import QuerySet
 from django.http import HttpResponse
+from django.test import Client, RequestFactory, TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
 
 from core.models import KostLocation, Room
+from finance.models import ElectricityReading, Invoice, OperationCost, Payment
+from tenants.models import MaintenanceTicket, Tenant, TenantContract
 from users.models import AdminProfile
-from tenants.models import Tenant, TenantContract, MaintenanceTicket
-from finance.models import Invoice, Payment, ElectricityReading, OperationCost
 
 User = get_user_model()
 
@@ -918,7 +917,7 @@ class FullBusinessProcessTest(TestCase):
         tenant, contract, invoice, payment = self._setup_verification_data()
         invoice.due_date = date.today() - timedelta(days=5)
         invoice.save()
-        resp = self.admin_ancol_client.post(
+        self.admin_ancol_client.post(
             reverse('verify_payment', args=[payment.pk, 'reject']),
             {'rejection_note': 'Wrong amount'}
         )
@@ -1335,7 +1334,7 @@ class FullBusinessProcessTest(TestCase):
             emergency_contact_phone='082'
         )
         room = self.rooms['A-103']
-        contract = TenantContract.objects.create(
+        TenantContract.objects.create(
             tenant=tenant, room=room,
             start_date=date.today(), monthly_rent_amount=Decimal('1500000')
         )
@@ -1444,7 +1443,7 @@ class FullBusinessProcessTest(TestCase):
             tenant=tenant, room=self.rooms['K-103'],
             start_date=date.today(), monthly_rent_amount=Decimal('1500000')
         )
-        resp = self.admin_ancol_client.post(
+        self.admin_ancol_client.post(
             reverse('tenant_checkout', args=[tenant.pk])
         )
         contract.refresh_from_db()
@@ -1452,7 +1451,7 @@ class FullBusinessProcessTest(TestCase):
 
     def test_phase13_06_superuser_sees_all_invoices(self):
         """Security: Superuser sees invoices from all locations."""
-        for room_key, loc in [('A-101', self.loc_ancol), ('K-101', self.loc_kana)]:
+        for room_key in ('A-101', 'K-101'):
             tenant = Tenant.objects.create(
                 full_name=f'Global {room_key}', phone_number='081',
                 emergency_contact_phone='082'
@@ -2113,6 +2112,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase16_04_admin_payment_is_readonly_evidence(self):
         """W1b: PaymentAdmin is evidence-only (no add/delete, all fields read-only)."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import PaymentAdmin
         ma = PaymentAdmin(Payment, dj_admin.site)
         self.assertFalse(ma.has_add_permission(None))
@@ -2125,6 +2125,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase16_05_admin_invoice_lunas_is_view_only(self):
         """W1b: LUNAS invoices are fully read-only in admin; no delete ever."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import InvoiceAdmin
         ma = InvoiceAdmin(Invoice, dj_admin.site)
         self.assertFalse(ma.has_delete_permission(None))
@@ -2147,6 +2148,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase16_06_admin_electricity_reading_readonly_after_lunas(self):
         """W1b: ElectricityReadingAdmin is append-less/delete-less and locked after LUNAS."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import ElectricityReadingAdmin
         ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
         self.assertFalse(ma.has_add_permission(None))
@@ -2298,6 +2300,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase2_07_admin_delete_permission_disabled(self):
         """W11/W11b: admin delete is disabled for locations and rooms."""
         from django.contrib import admin as dj_admin
+
         from core.admin import KostLocationAdmin, RoomAdmin
         self.assertFalse(KostLocationAdmin(KostLocation, dj_admin.site).has_delete_permission(None))
         self.assertFalse(RoomAdmin(Room, dj_admin.site).has_delete_permission(None))
@@ -2485,6 +2488,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase16_07_admin_electricity_reading_cannot_be_repointed(self):
         """RC1: reading's invoice FK is always read-only; the change form drops it."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import ElectricityReadingAdmin
         ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
         tenant, contract, invoice = self._setup_payment_data()
@@ -2518,6 +2522,7 @@ class FullBusinessProcessTest(TestCase):
     def test_phase12_06_checkout_uses_configured_local_date(self):
         """RC4: checkout end_date = local business date across a UTC date boundary."""
         from unittest import mock
+
         from django.utils import timezone as dj_timezone
         tenant = Tenant.objects.create(
             full_name='TZ Boundary', phone_number='081',
@@ -2528,7 +2533,7 @@ class FullBusinessProcessTest(TestCase):
             start_date=date.today() - timedelta(days=30),
             monthly_rent_amount=Decimal('1500000')
         )
-        fixed_utc = datetime(2030, 1, 1, 20, 0, tzinfo=dt_timezone.utc)  # 2030-01-02 03:00 WIB
+        fixed_utc = datetime(2030, 1, 1, 20, 0, tzinfo=UTC)  # 2030-01-02 03:00 WIB
         real_localdate = dj_timezone.localdate
         with override_settings(TIME_ZONE='Asia/Jakarta'):
             with mock.patch(
@@ -2858,6 +2863,7 @@ class FullBusinessProcessTest(TestCase):
     def test_w5_01_admin_invoice_menunggu_locks_financial_fields(self):
         """W5: MENUNGGU invoice keeps amounts/contract/due-date read-only in admin."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import InvoiceAdmin
         ma = InvoiceAdmin(Invoice, dj_admin.site)
         tenant, contract, invoice, payment = self._setup_verification_data()  # MENUNGGU
@@ -2914,6 +2920,7 @@ class FullBusinessProcessTest(TestCase):
     def test_w5_04_admin_electricity_readonly_when_menunggu(self):
         """W5: ElectricityReading is fully read-only while its invoice awaits verification."""
         from django.contrib import admin as dj_admin
+
         from finance.admin import ElectricityReadingAdmin
         ma = ElectricityReadingAdmin(ElectricityReading, dj_admin.site)
         tenant, contract, invoice = self._setup_payment_data()

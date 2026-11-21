@@ -1,5 +1,7 @@
 from django import forms
+
 from .models import KostLocation, Room
+
 
 class KostLocationForm(forms.ModelForm):
     """

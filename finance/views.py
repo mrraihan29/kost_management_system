@@ -1,25 +1,34 @@
-from django.shortcuts import render, redirect, get_object_or_404
+import datetime
+
+import openpyxl
+from dateutil.relativedelta import relativedelta
 from django.contrib import messages
-from core.models import Room, KostLocation
-from tenants.models import TenantContract, MaintenanceTicket
-from .models import Invoice, Payment, ElectricityReading, OperationCost
-from .forms import PinValidationForm, PaymentUploadForm, ElectricityForm, OperationCostForm, MaintenanceForm, ReportFilterForm
-from .services import sync_overdue_invoice_statuses
-from config.security import check_rate_limit, record_failed_attempt, reset_rate_limit, log_action
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.db import IntegrityError, transaction
-from django.db.models import Q, Sum, Count
-from django.db.models.functions import TruncMonth
-from django.http import HttpResponse, HttpResponseForbidden
-from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
-from dateutil.relativedelta import relativedelta
-import datetime
-import openpyxl
-from openpyxl.styles import Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Sum
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from openpyxl.styles import Font
+
+from config.security import check_rate_limit, log_action, record_failed_attempt, reset_rate_limit
+from core.models import KostLocation, Room
+from tenants.models import MaintenanceTicket, TenantContract
+
+from .forms import (
+    ElectricityForm,
+    MaintenanceForm,
+    OperationCostForm,
+    PaymentUploadForm,
+    PinValidationForm,
+    ReportFilterForm,
+)
+from .models import ElectricityReading, Invoice, OperationCost, Payment
+from .services import sync_overdue_invoice_statuses
+
 
 def public_payment_step1(request):
     """
@@ -853,7 +862,8 @@ def export_finance_excel(request):
     font_bold = Font(bold=True)
     headers = ['Bulan', 'Pemasukan (Periode Tagihan)', 'Pengeluaran', 'Profit Bersih']
     ws1.append(headers)
-    for cell in ws1[1]: cell.font = font_bold
+    for cell in ws1[1]:
+        cell.font = font_bold
 
     # Isi Data
     for month in range(1, 13):
@@ -866,7 +876,8 @@ def export_finance_excel(request):
     # --- SHEET 2: DETAIL PEMASUKAN ---
     ws2 = wb.create_sheet(title="Rincian Pemasukan")
     ws2.append(['Tanggal', 'Penghuni', 'Kamar', 'Jumlah', 'Admin Verifikasi'])
-    for cell in ws2[1]: cell.font = font_bold
+    for cell in ws2[1]:
+        cell.font = font_bold
     
     for inv in invoices.order_by('billing_period_start'):
         # Ambil admin yang verifikasi pembayaran terakhir
@@ -888,7 +899,8 @@ def export_finance_excel(request):
     # --- SHEET 3: DETAIL PENGELUARAN ---
     ws3 = wb.create_sheet(title="Rincian Operasional")
     ws3.append(['Tanggal', 'Kategori', 'Keterangan', 'Jumlah', 'Admin'])
-    for cell in ws3[1]: cell.font = font_bold
+    for cell in ws3[1]:
+        cell.font = font_bold
 
     for cost in costs.order_by('incurred_date'):
         ws3.append([

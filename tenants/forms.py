@@ -1,9 +1,10 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Tenant
-from .models import TenantContract
+
 from core.models import Room
 from finance.forms import validate_image_file  # Reuse existing validator
+
+from .models import Tenant, TenantContract
 
 
 class TenantForm(forms.ModelForm):

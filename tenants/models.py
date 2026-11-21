@@ -1,11 +1,14 @@
-import uuid
 import os
-from django.db import models
-from django.db.models import Q
-from django.core.exceptions import ValidationError
-from core.models import Room
 import secrets
 import string
+import uuid
+
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+
+from core.models import Room
+
 
 # Fungsi utilitas untuk merename file KTP agar unik (Security NFR-02)
 def ktp_upload_path(instance, filename):
@@ -55,21 +58,8 @@ class TenantContract(models.Model):
             ),
         ]
 
-    def clean(self):
-        if not self.is_active:
-            return
-
-        room = getattr(self, 'room', None)
-        tenant = getattr(self, 'tenant', None)
-
-        if not room or not tenant:
-            return
-
-        if TenantContract.objects.filter(room=room, is_active=True).exclude(pk=self.pk).exists():
-            raise ValidationError({'room': 'Kamar ini sudah memiliki kontrak aktif.'})
-
-        if TenantContract.objects.filter(tenant=tenant, is_active=True).exclude(pk=self.pk).exists():
-            raise ValidationError({'tenant': 'Tenant ini sudah memiliki kontrak aktif.'})
+    def __str__(self):
+        return f"Kontrak: {self.tenant.full_name} - {self.room.room_number}"
 
     # --- OVERRIDE SAVE ---
     def save(self, *args, **kwargs):
@@ -91,6 +81,22 @@ class TenantContract(models.Model):
                 else:
                     raise
 
+    def clean(self):
+        if not self.is_active:
+            return
+
+        room = getattr(self, 'room', None)
+        tenant = getattr(self, 'tenant', None)
+
+        if not room or not tenant:
+            return
+
+        if TenantContract.objects.filter(room=room, is_active=True).exclude(pk=self.pk).exists():
+            raise ValidationError({'room': 'Kamar ini sudah memiliki kontrak aktif.'})
+
+        if TenantContract.objects.filter(tenant=tenant, is_active=True).exclude(pk=self.pk).exists():
+            raise ValidationError({'tenant': 'Tenant ini sudah memiliki kontrak aktif.'})
+
     def generate_unique_pin(self):
         # Loop sampai menemukan PIN yang belum dipakai (untuk hindari duplikat)
         # W10/BQ-4: gunakan CSPRNG (secrets), bukan random
@@ -99,8 +105,6 @@ class TenantContract(models.Model):
             if not TenantContract.objects.filter(payment_pin=new_pin).exists():
                 return new_pin
 
-    def __str__(self):
-        return f"Kontrak: {self.tenant.full_name} - {self.room.room_number}"
     
 def ticket_upload_path(instance, filename):
     ext = filename.split('.')[-1]

@@ -1,15 +1,20 @@
-from django.shortcuts import render, redirect, get_object_or_404
+import re
+
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Prefetch, Sum
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from core.models import KostLocation, Room
 from finance.models import Invoice, Payment
 from finance.services import sync_overdue_invoice_statuses
 from tenants.models import TenantContract
-from core.models import Room, KostLocation
-from django.db.models import Sum, Prefetch
+
 from .forms import KostLocationForm, RoomForm
-from django.contrib import messages
-from django.utils import timezone
-from django.views.decorators.http import require_POST
-import re
+
+
 # --- VIEW 1: LANDING PAGE (YANG HILANG) ---
 def home(request):
     """
@@ -98,15 +103,20 @@ def admin_dashboard(request):
             last_invoice = active_contract.invoices.all().first()  # Sudah di-prefetch
             if last_invoice:
                 if last_invoice.status == 'LUNAS':
-                    status_code = 'LUNAS'; color_class = 'bg-success text-white'
+                    status_code = 'LUNAS'
+                    color_class = 'bg-success text-white'
                 elif last_invoice.status == 'TELAT_BAYAR':
-                    status_code = 'TELAT'; color_class = 'bg-danger text-white'
+                    status_code = 'TELAT'
+                    color_class = 'bg-danger text-white'
                 elif last_invoice.status == 'MENUNGGU_VERIFIKASI':
-                    status_code = 'PROSES'; color_class = 'bg-warning text-dark'
+                    status_code = 'PROSES'
+                    color_class = 'bg-warning text-dark'
                 else:
-                    status_code = 'TAGIHAN'; color_class = 'bg-white border border-secondary text-dark'
+                    status_code = 'TAGIHAN'
+                    color_class = 'bg-white border border-secondary text-dark'
             else:
-                status_code = 'AMAN'; color_class = 'bg-success text-white'
+                status_code = 'AMAN'
+                color_class = 'bg-success text-white'
 
         room_visual_data.append({
             'number': room.room_number,

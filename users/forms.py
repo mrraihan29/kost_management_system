@@ -1,7 +1,10 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+
 from core.models import KostLocation
-from .models import User, AdminProfile
+
+from .models import User
+
 
 class StaffCreationForm(UserCreationForm):
     """

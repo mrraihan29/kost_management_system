@@ -1,9 +1,11 @@
-from decimal import Decimal
-import uuid
 import os
-from django.db import models, transaction
+import uuid
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import models, transaction
+
 from core.models import KostLocation
 from tenants.models import TenantContract
 
@@ -54,6 +56,9 @@ class Invoice(models.Model):
             )
         ]
     
+    def __str__(self):
+        return f"Tagihan {self.contract.tenant.full_name} ({self.billing_period_start})"
+
     def save(self, *args, **kwargs):
         # Selalu hitung ulang total saat save (A-DATA-01 fix)
         self.total_amount = self.base_rent_amount + self.electricity_bill_amount
@@ -63,9 +68,6 @@ class Invoice(models.Model):
             self.billing_period_month = self.billing_period_start.month
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"Tagihan {self.contract.tenant.full_name} ({self.billing_period_start})"
-
 class ElectricityReading(models.Model):
     # Relasi 1-to-1: 1 Tagihan = 1 Catatan Listrik (Sesuai ERD)
     invoice = models.OneToOneField(Invoice, on_delete=models.CASCADE, related_name='electricity_reading')
@@ -73,6 +75,9 @@ class ElectricityReading(models.Model):
     meter_reading_end = models.IntegerField()
     rate_per_kwh = models.DecimalField(max_digits=10, decimal_places=2)
     calculated_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True)
+
+    def __str__(self):
+        return f"Listrik Tagihan #{self.invoice.id}"
 
     def save(self, *args, **kwargs):
         # W2: serialize electricity writes against payment approval on the invoice row.
@@ -108,9 +113,6 @@ class ElectricityReading(models.Model):
                 # Caller-side objects are intentionally NOT mutated: the DB row is
                 # the source of truth; callers must refresh if they re-read values.
 
-    def __str__(self):
-        return f"Listrik Tagihan #{self.invoice.id}"
-
 class Payment(models.Model):
     STATUS_CHOICES = [
         ('PENDING', 'Menunggu Keputusan'),
@@ -132,7 +134,7 @@ class Payment(models.Model):
         blank=True
     )
     verified_at = models.DateTimeField(null=True, blank=True)
-    rejection_note = models.TextField(blank=True, null=True)
+    rejection_note = models.TextField(blank=True, null=True)  # noqa: DJ001 schema change deferred to EKM-27 (reason becomes required)
 
     def __str__(self):
         return f"Pembayaran untuk Tagihan #{self.invoice.id}"

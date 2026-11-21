@@ -1,16 +1,16 @@
 import random
-from faker import Faker
+from decimal import Decimal
+
+from dateutil.relativedelta import relativedelta
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from django.contrib.auth import get_user_model
+from faker import Faker
 
 # Import yang sudah diperbaiki
 from core.models import KostLocation, Room
-from users.models import AdminProfile 
+from finance.models import Invoice
 from tenants.models import Tenant, TenantContract
-from finance.models import Invoice, Payment
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal
 
 User = get_user_model()
 fake = Faker(['id_ID']) 

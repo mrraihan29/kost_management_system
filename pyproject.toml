@@ -1,0 +1,66 @@
+[project]
+name = "evy-kost-management"
+version = "0.1.0"
+description = "Rent collection for the Evy kost locations (Django)."
+requires-python = ">=3.11"
+# Versions are unchanged from the old requirements.txt; EKM-13 upgrades them.
+dependencies = [
+    "asgiref==3.10.0",
+    "dj-database-url==3.0.1",
+    "Django==5.0.6",
+    "django-axes==8.3.1",
+    "django-csp==4.0",
+    "et_xmlfile==2.0.0",
+    "Faker==38.0.0",
+    "gunicorn==23.0.0",
+    "openpyxl==3.1.5",
+    "packaging==25.0",
+    "pillow==12.0.0",
+    "psycopg2-binary==2.9.11",
+    "python-dateutil==2.9.0.post0",
+    "python-dotenv==1.2.1",
+    "six==1.17.0",
+    "sqlparse==0.5.3",
+    "tzdata==2025.2",
+    "whitenoise==6.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-django",
+    "ruff",
+    "pyright",
+    "mutmut",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings_test"
+python_files = ["tests_*.py", "tests.py", "test_*.py"]
+testpaths = ["."]
+# The doctest plugin would collect the old test_all.txt log as a doctest file.
+addopts = "-p no:doctest"
+norecursedirs = [".git", ".venv", "venv", "node_modules", "graphify-out", ".impeccable", ".commandcode", "media", "staticfiles"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["*/migrations/*", "graphify-out", ".impeccable", ".commandcode"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ"]
+# E501: long lines in legacy views and Indonesian UI strings; the formatter wraps code,
+# and new modules stay under the limit. Remove when the legacy views are rewritten.
+ignore = ["E501"]
+
+[tool.pyright]
+include = ["config", "core", "finance", "tenants", "users"]
+exclude = ["**/migrations", "**/__pycache__"]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+# Strict for modules created from EKM-12 on (CONSTRAINTS.md exception X-1).
+strict = []
+reportMissingModuleSource = false

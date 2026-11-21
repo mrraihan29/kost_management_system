@@ -1,10 +1,11 @@
 from django.db import models
 
+
 # Create your models here.
 class KostLocation(models.Model):
     name = models.CharField(max_length=100)
     address = models.TextField()
-    description = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)  # noqa: DJ001 schema change deferred to EKM-19 (location migration)
     # Tarif Berdasarkan Listrik per lokasi (FR-06)
     electricity_rate_per_kwh = models.DecimalField(max_digits=10, decimal_places=2, default=1500.00)
     

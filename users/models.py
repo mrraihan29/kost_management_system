@@ -1,6 +1,8 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
+
 from core.models import KostLocation
+
 
 # 1. Custom User Model (Pengganti User bawaan)
 class User(AbstractUser):

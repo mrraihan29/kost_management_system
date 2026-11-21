@@ -7,4 +7,6 @@ db.sqlite3
 .DS_Store
 media/
 logs/
-staticfiles/
+staticfiles/.pytest_cache/
+.ruff_cache/
+.bin/
