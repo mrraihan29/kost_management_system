@@ -617,35 +617,35 @@ Design system: [`DESIGN.md`](../../DESIGN.md), the Plat Nomor direction (D-004 v
 
 | ID | Statement (short) | Decisions | Report section / diagram | Test (seam or e2e) | Ticket |
 |---|---|---|---|---|---|
-| R-001 | Three user types | D-005 | 1 | e2e/test_isolation.py | |
-| R-002 | Three priority flows; invoice issuing first | D-013 | 5, seq-invoice-issue | e2e/test_billing.py | |
-| R-003 | Staff under 2 min, Tenant under 3 min | | 1, 9 | e2e/test_staff_home.py (timed) | |
-| R-004 | No new features beyond the ledger | D-001 | 1, 11 | review | |
-| R-005 | 3 x 80 rooms, p95 under 1 s | | 2, 10 | performance check with seed data | |
-| R-006 | ID photo 30 days, records 5 years | | 4 | seam tenants/retention.py | |
-| R-007 | Location isolation, PIN access, ASVS L2 | D-005 | 6 | e2e/test_isolation.py, seam core/scoping.py | |
-| R-008 | Latest stable dependencies | D-006 | 3, ADR 0001 | CI: outdated check | |
-| R-009 | Mobile-first, Indonesian, WCAG 2.2 AA | D-004, D-007, D-009 | 7, DESIGN.md | axe in every e2e test | |
-| R-010 | Served at ekm.web.id | | 10 | smoke after deploy | |
-| R-011 | No deadline or budget | | 11 | n/a | |
-| R-012 | Ancol cycle date from contract start | D-013 | 5 | seam finance/billing.py, e2e/test_billing.py | |
-| R-013 | Ancol issue 7 days before, due +10 | D-010, D-013 | 5, seq-invoice-issue | seam finance/billing.py, e2e/test_billing.py | |
-| R-014 | Simultaneous issue with preview | D-013 | 5, seq-invoice-issue | seam finance/billing.py, e2e/test_billing.py | |
-| R-015 | Metered invoice hidden until reading | D-013 | 4, state-invoice | seam finance/billing.py, e2e/test_billing.py | |
-| R-016 | One-step onboarding with first invoice | | 3 | seam tenants/onboarding.py, e2e/test_onboarding.py | |
-| R-017 | Verify on invoice detail, reason required | | 5, seq-proof-verify | seam finance/payments.py, e2e/test_verification.py | |
-| R-018 | Tenant home after PIN | | 7, seq-pin-signin | e2e/test_verification.py | |
-| R-019 | Critical flows have e2e tests | D-014 | 9 | ledger check `--require tests` | |
-| R-020 | Coolify staging and production, B2 backups | | 10 | Ship checklist, restore drill | |
-| R-021 | Bank details per location | | 4, 7 | e2e/test_verification.py | |
-| R-022 | All unpaid invoices, oldest first | | 7 | seam finance/payments.py, e2e/test_verification.py | |
-| R-023 | First invoice full month or prorated | D-013 | 5 | seam finance/billing.py, e2e/test_billing.py | |
-| R-024 | Late without fee, in work queue | D-010 | 5, state-invoice | seam finance/billing.py, e2e/test_billing.py | |
-| R-025 | Checkout only when all paid | | 5 | seam finance/payments.py, e2e/test_onboarding.py | |
-| R-026 | One income basis | | 3 | seam finance/income.py | |
-| R-027 | Location settings, Owner only | D-013 | 3, ADR 0002 | seam core/scoping.py, e2e/test_isolation.py | |
-| R-028 | Staff home work queue, navigation | D-004, D-012 | 7, mockups | e2e/test_staff_home.py | |
-| R-029 | Media on persistent volume, backed up | | 10 | Ship checklist | |
-| R-030 | 99% availability, CI gates, Sentry, uptime | | 10 | CI, monitor report | |
-| R-031 | TOTP for Owner and Staff | D-015 | 6 (T-002) | e2e/test_signin.py | |
-| R-032 | PDP legal basis, notice, rights, breach procedure | | 4 | e2e/test_verification.py (notice), docs/operations/BREACH.md | |
+| R-001 | Three user types | D-005 | 1 | e2e/test_isolation.py | EKM-15, EKM-31 |
+| R-002 | Three priority flows; invoice issuing first | D-013 | 5, seq-invoice-issue | e2e/test_billing.py | EKM-20, EKM-21 |
+| R-003 | Staff under 2 min, Tenant under 3 min | | 1, 9 | e2e/test_staff_home.py (timed) | EKM-30, EKM-36 |
+| R-004 | No new features beyond the ledger | D-001 | 1, 11 | review | EKM-32, EKM-33 |
+| R-005 | 3 x 80 rooms, p95 under 1 s | | 2, 10 | performance check with seed data | EKM-37 |
+| R-006 | ID photo 30 days, records 5 years | | 4 | seam tenants/retention.py | EKM-35 |
+| R-007 | Location isolation, PIN access, ASVS L2 | D-005 | 6 | e2e/test_isolation.py, seam core/scoping.py | EKM-15, EKM-16, EKM-36 |
+| R-008 | Latest stable dependencies | D-006 | 3, ADR 0001 | CI: outdated check | EKM-11, EKM-13 |
+| R-009 | Mobile-first, Indonesian, WCAG 2.2 AA | D-004, D-007, D-009 | 7, DESIGN.md | axe in every e2e test | EKM-17, EKM-18, EKM-32, EKM-33 |
+| R-010 | Served at ekm.web.id | | 10 | smoke after deploy | EKM-9 |
+| R-011 | No deadline or budget | | 11 | n/a | EKM-4 |
+| R-012 | Ancol cycle date from contract start | D-013 | 5 | seam finance/billing.py, e2e/test_billing.py | EKM-20 |
+| R-013 | Ancol issue 7 days before, due +10 | D-010, D-013 | 5, seq-invoice-issue | seam finance/billing.py, e2e/test_billing.py | EKM-20 |
+| R-014 | Simultaneous issue with preview | D-013 | 5, seq-invoice-issue | seam finance/billing.py, e2e/test_billing.py | EKM-21 |
+| R-015 | Metered invoice hidden until reading | D-013 | 4, state-invoice | seam finance/billing.py, e2e/test_billing.py | EKM-23 |
+| R-016 | One-step onboarding with first invoice | | 3 | seam tenants/onboarding.py, e2e/test_onboarding.py | EKM-25 |
+| R-017 | Verify on invoice detail, reason required | | 5, seq-proof-verify | seam finance/payments.py, e2e/test_verification.py | EKM-27 |
+| R-018 | Tenant home after PIN | | 7, seq-pin-signin | e2e/test_verification.py | EKM-28 |
+| R-019 | Critical flows have e2e tests | D-014 | 9 | ledger check `--require tests` | EKM-12, EKM-14, EKM-36 |
+| R-020 | Coolify staging and production, B2 backups | | 10 | Ship checklist, restore drill | EKM-9 |
+| R-021 | Bank details per location | | 4, 7 | e2e/test_verification.py | EKM-19, EKM-28 |
+| R-022 | All unpaid invoices, oldest first | | 7 | seam finance/payments.py, e2e/test_verification.py | EKM-28 |
+| R-023 | First invoice full month or prorated | D-013 | 5 | seam finance/billing.py, e2e/test_billing.py | EKM-22 |
+| R-024 | Late without fee, in work queue | D-010 | 5, state-invoice | seam finance/billing.py, e2e/test_billing.py | EKM-24, EKM-30 |
+| R-025 | Checkout only when all paid | | 5 | seam finance/payments.py, e2e/test_onboarding.py | EKM-26 |
+| R-026 | One income basis | | 3 | seam finance/income.py | EKM-29 |
+| R-027 | Location settings, Owner only | D-013 | 3, ADR 0002 | seam core/scoping.py, e2e/test_isolation.py | EKM-19, EKM-24 |
+| R-028 | Staff home work queue, navigation | D-004, D-012 | 7, mockups | e2e/test_staff_home.py | EKM-17, EKM-30, EKM-31 |
+| R-029 | Media on persistent volume, backed up | | 10 | Ship checklist | EKM-9 |
+| R-030 | 99% availability, CI gates, Sentry, uptime | | 10 | CI, monitor report | EKM-9, EKM-14 |
+| R-031 | TOTP for Owner and Staff | D-015 | 6 (T-002) | e2e/test_signin.py | EKM-34 |
+| R-032 | PDP legal basis, notice, rights, breach procedure | | 4 | e2e/test_verification.py (notice), docs/operations/BREACH.md | EKM-28, EKM-35 |

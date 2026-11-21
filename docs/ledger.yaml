@@ -20,6 +20,8 @@ entries:
     acceptance:
       - "Every screen is reachable by exactly one of the roles Owner, Staff or Tenant"
       - "No fourth role or account type exists"
+    links:
+      tickets: ["EKM-15@1", "EKM-31@1"]
 
   - id: R-002
     type: requirement
@@ -33,6 +35,8 @@ entries:
       - "Each of the three flows can be completed end to end without leaving its guided path"
       - "At Ancol, each room's invoice is issued on that room's own cycle date"
       - "At the two other locations, one Staff action issues the invoices for every active contract of that location"
+    links:
+      tickets: ["EKM-20@1", "EKM-21@1"]
 
   - id: R-003
     type: requirement
@@ -45,6 +49,8 @@ entries:
     acceptance:
       - "Timed walkthrough: Staff verifies one payment and records one meter reading on a 375px viewport in under 120 seconds"
       - "Timed walkthrough: Tenant goes from PIN entry to upload confirmation in under 180 seconds"
+    links:
+      tickets: ["EKM-30@1", "EKM-36@1"]
 
   - id: D-001
     type: decision
@@ -66,6 +72,8 @@ entries:
     acceptance:
       - "The first release contains no feature absent from the current application"
       - "No payment-gateway, native-app or tenant-account code exists"
+    links:
+      tickets: ["EKM-32@1", "EKM-33@1"]
 
   - id: R-005
     type: requirement
@@ -76,6 +84,8 @@ entries:
     statement: "The system is sized for 3 locations of 80 rooms each (240 rooms); main pages respond in under 1 second at that size."
     acceptance:
       - "With seed data of 3 locations x 80 rooms and 12 months of invoices, dashboard, invoice list and room list each render in under 1000 ms at p95"
+    links:
+      tickets: ["EKM-37@1"]
 
   - id: R-006
     type: requirement
@@ -88,6 +98,8 @@ entries:
     acceptance:
       - "A scheduled job deletes ID-card photos of tenants checked out more than 30 days ago"
       - "A scheduled job deletes tenant records and invoices older than 5 years after checkout"
+    links:
+      tickets: ["EKM-35@1"]
 
   - id: R-007
     type: requirement
@@ -100,6 +112,8 @@ entries:
     acceptance:
       - "Staff requests for another location's rooms, tenants, invoices, costs or tickets are denied"
       - "Tenant portal access requires a matching location, room number and active-contract PIN, rate limited"
+    links:
+      tickets: ["EKM-15@1", "EKM-16@1", "EKM-36@1"]
 
   - id: D-002
     type: decision
@@ -120,6 +134,8 @@ entries:
     acceptance:
       - "pip list --outdated reports no outdated direct dependency at release time"
       - "The Django version in use is inside its upstream security-support window"
+    links:
+      tickets: ["EKM-11@1", "EKM-13@1"]
 
   - id: D-003
     type: decision
@@ -142,6 +158,8 @@ entries:
       - "Every page is usable at a 375px viewport without horizontal page scroll"
       - "All dates and amounts render in Indonesian format"
       - "axe reports zero critical or serious violations"
+    links:
+      tickets: ["EKM-17@1", "EKM-18@1", "EKM-32@1", "EKM-33@1"]
 
   - id: D-004
     type: decision
@@ -162,6 +180,8 @@ entries:
     statement: "Production is served at https://ekm.web.id."
     acceptance:
       - "https://ekm.web.id/health/ returns status ok over HTTPS"
+    links:
+      tickets: ["EKM-9@1"]
 
   - id: R-011
     type: requirement
@@ -172,8 +192,12 @@ entries:
     statement: "There is no hard deadline, cost ceiling or stated VPS resource limit; the owner is the single decider."
     acceptance:
       - "No release date or budget figure is used as a planning constraint"
+    links:
+      tickets: ["EKM-4@1"]
+
 
   # --- Round 2 (owner numbered answers 1-12 map to Q14-Q25) ---
+
   - id: R-012
     type: requirement
     version: 1
@@ -186,6 +210,8 @@ entries:
       - "A contract starting on the 10th gets invoices dated the 10th of every month"
       - "Paying an invoice late leaves the next invoice's cycle date unchanged"
       - "A start day of 29-31 clamps to the last day of shorter months"
+    links:
+      tickets: ["EKM-20@1"]
 
   - id: R-013
     type: requirement
@@ -199,6 +225,8 @@ entries:
       - "A daily job creates the invoice for a per-room-cycle contract when the cycle date is 7 days away"
       - "The invoice due date equals the cycle date plus 10 days"
       - "Running the job twice creates no duplicate invoice"
+    links:
+      tickets: ["EKM-20@1"]
 
   - id: R-014
     type: requirement
@@ -212,6 +240,8 @@ entries:
       - "The action shows the number of invoices to be created before confirmation"
       - "Confirming creates one invoice per active contract dated the 1st and due the 11th of the chosen month"
       - "Repeating the action for the same month creates no duplicate invoice"
+    links:
+      tickets: ["EKM-21@1"]
 
   - id: R-015
     type: requirement
@@ -225,6 +255,8 @@ entries:
       - "A metered-room invoice without a reading is not shown in the Tenant portal"
       - "After the reading is saved the invoice total includes electricity and the invoice is payable"
       - "A token-room invoice is payable as soon as it is issued"
+    links:
+      tickets: ["EKM-23@1"]
 
   - id: R-016
     type: requirement
@@ -237,6 +269,8 @@ entries:
     acceptance:
       - "Submitting the form creates the tenant, the active contract with a PIN and the first invoice in one transaction"
       - "A validation error creates none of them"
+    links:
+      tickets: ["EKM-25@1"]
 
   - id: R-017
     type: requirement
@@ -250,6 +284,8 @@ entries:
       - "The invoice detail page of an invoice awaiting verification shows the proof image and approve and reject actions"
       - "Reject without a reason is refused"
       - "The Tenant portal shows the rejection reason for the rejected payment"
+    links:
+      tickets: ["EKM-27@1"]
 
   - id: R-018
     type: requirement
@@ -262,6 +298,8 @@ entries:
     acceptance:
       - "A successful PIN entry lands on a page that shows invoice status, upload action, history link and damage-report link"
       - "The upload confirmation keeps the Tenant signed in to that home page"
+    links:
+      tickets: ["EKM-28@1"]
 
   - id: D-005
     type: decision
@@ -283,6 +321,8 @@ entries:
     acceptance:
       - "Each of the six critical flows has a Playwright e2e test tagged with its ledger id"
       - "The existing Django test suite passes"
+    links:
+      tickets: ["EKM-12@1", "EKM-14@1", "EKM-36@1"]
 
   - id: D-006
     type: decision
@@ -314,8 +354,12 @@ entries:
       - "staging.ekm.web.id and ekm.web.id run as separate environments with separate databases"
       - "A daily database backup lands in the B2 bucket"
       - "A backup is taken before each production migration"
+    links:
+      tickets: ["EKM-9@1"]
+
 
   # --- Round 3 (Q27-Q42, owner answered "setuju semua") ---
+
   - id: R-021
     type: requirement
     version: 1
@@ -327,6 +371,8 @@ entries:
     acceptance:
       - "Only the Owner can edit a location's bank details"
       - "The Tenant invoice page shows bank name, account number, account holder and the invoice total"
+    links:
+      tickets: ["EKM-19@1", "EKM-28@1"]
 
   - id: R-022
     type: requirement
@@ -339,6 +385,8 @@ entries:
     acceptance:
       - "A Tenant with two unpaid invoices sees both, the older one first"
       - "Uploading a proof for one invoice leaves the other invoice's status unchanged"
+    links:
+      tickets: ["EKM-28@1"]
 
   - id: R-023
     type: requirement
@@ -352,6 +400,8 @@ entries:
       - "Per-room cycle: move-in on the 10th creates a first invoice of the full monthly rent dated the 10th"
       - "Simultaneous: move-in on the 21st of a 30-day month creates a first invoice of 10/30 of the monthly rent"
       - "Simultaneous: the following month's invoice is the full monthly rent"
+    links:
+      tickets: ["EKM-22@1"]
 
   - id: R-024
     type: requirement
@@ -365,6 +415,8 @@ entries:
       - "An unpaid invoice past its due date is marked Telat by the daily job"
       - "The invoice total is unchanged by lateness"
       - "The Staff work queue lists it with a WhatsApp reminder link"
+    links:
+      tickets: ["EKM-24@1", "EKM-30@1"]
 
   - id: R-025
     type: requirement
@@ -378,6 +430,8 @@ entries:
       - "Checkout with an unpaid or awaiting-verification invoice is refused"
       - "Checkout creates no refund or credit record"
       - "After checkout the room is available"
+    links:
+      tickets: ["EKM-26@1"]
 
   - id: R-026
     type: requirement
@@ -390,6 +444,8 @@ entries:
     acceptance:
       - "For the same month and location, dashboard income, report income and export income are equal"
       - "A payment verified in March for a February invoice counts as March income"
+    links:
+      tickets: ["EKM-29@1"]
 
   - id: R-027
     type: requirement
@@ -403,6 +459,8 @@ entries:
       - "Renaming a location changes no billing behaviour"
       - "Only the Owner can change billing mode and the electricity setting"
       - "The migration sets Ancol to per-room with electricity and the other locations to simultaneous without electricity"
+    links:
+      tickets: ["EKM-19@1", "EKM-24@1"]
 
   - id: R-028
     type: requirement
@@ -416,6 +474,8 @@ entries:
       - "The Staff home page lists the four queue types above the room map"
       - "Each queue item links to the page where it is resolved"
       - "Staff navigation shows exactly five items; Owner navigation shows eight"
+    links:
+      tickets: ["EKM-17@1", "EKM-30@1", "EKM-31@1"]
 
   - id: D-008
     type: decision
@@ -455,6 +515,8 @@ entries:
     acceptance:
       - "Uploaded files survive a redeploy"
       - "The daily backup in B2 contains the media files"
+    links:
+      tickets: ["EKM-9@1"]
 
   - id: R-030
     type: requirement
@@ -468,6 +530,8 @@ entries:
       - "A pull request cannot merge with a failing CI gate"
       - "An unhandled server error appears in Sentry"
       - "The external monitor checks the health endpoint and reports monthly uptime"
+    links:
+      tickets: ["EKM-9@1", "EKM-14@1"]
 
   - id: R-031
     type: requirement
@@ -481,6 +545,8 @@ entries:
       - "An Owner or Staff sign-in without a valid TOTP code is refused"
       - "A TOTP code is accepted only once"
       - "A password reset does not bypass TOTP"
+    links:
+      tickets: ["EKM-34@2"]
 
   - id: R-032
     type: requirement
@@ -494,6 +560,8 @@ entries:
       - "The Tenant portal shows a privacy notice naming the data kept, its purpose and its retention"
       - "Staff can correct a Tenant's personal data and delete a checked-out Tenant's data on request"
       - "A written breach procedure with the 3 x 24 hour deadline exists in the repository"
+    links:
+      tickets: ["EKM-28@1", "EKM-35@1"]
 
   - id: D-011
     type: decision
@@ -540,3 +608,40 @@ entries:
     answer: "autonomous default"
     recommendation: "TOTP uses django-otp, the maintained Django package for one-time-password devices, rather than hand-written TOTP code. Confirmed at Gate 1."
     statement: "TOTP sign-in for Owner and Staff is implemented with django-otp."
+
+  # --- Gate 1 (2026-11-21): owner answered "Setuju semua" to the design and open questions O-1 to O-4 ---
+  - id: D-016
+    type: decision
+    version: 1
+    status: active
+    topic: 7
+    answer: "Setuju semua"
+    recommendation: "O-1: terima sebagai risiko. Portal hanya menampilkan tagihan penghuni itu sendiri, dan sudah dilindungi batas percobaan PIN serta sesi 30 menit."
+    statement: "Accepted risk: the Tenant portal uses single-factor access (location, room number, PIN) although ASVS 5.0 V6.3.3 asks for multi-factor access; mitigated by the PIN rate limit, 30-minute sessions, session rotation and per-contract authorization (T-001, T-003, T-008, T-014)."
+
+  - id: D-017
+    type: decision
+    version: 1
+    status: active
+    topic: 13
+    answer: "Setuju semua"
+    recommendation: "O-2: periksa versi PostgreSQL production di Coolify sebelum Plan; kalau di bawah 15, upgrade database menjadi tiket pertama."
+    statement: "The production PostgreSQL version is checked first; if it is below 15, upgrading the database is the first build ticket, before the Django 6.1 upgrade."
+
+  - id: D-018
+    type: decision
+    version: 1
+    status: active
+    topic: 7
+    answer: "Setuju semua"
+    recommendation: "O-3: TOTP wajib juga untuk Staff; setiap Staff mendaftarkan aplikasi authenticator sekali saat login pertama setelah rilis."
+    statement: "Staff enrol a TOTP authenticator at their first sign-in after the release; sign-in without TOTP is refused afterwards (implements R-031 v2)."
+
+  - id: D-019
+    type: decision
+    version: 1
+    status: active
+    topic: 11
+    answer: "Setuju semua"
+    recommendation: "O-4: setujui dependensi baru django-otp, pytest, pytest-django, pytest-playwright, axe-playwright-python, ruff, pyright, mutmut, dan alat CI osv-scanner, gitleaks, semgrep."
+    statement: "Gate 1 approves installing django-otp, pytest, pytest-django, pytest-playwright, axe-playwright-python, ruff, pyright and mutmut, and running osv-scanner, gitleaks and semgrep in CI."
