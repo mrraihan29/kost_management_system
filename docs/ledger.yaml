@@ -645,3 +645,22 @@ entries:
     answer: "Setuju semua"
     recommendation: "O-4: setujui dependensi baru django-otp, pytest, pytest-django, pytest-playwright, axe-playwright-python, ruff, pyright, mutmut, dan alat CI osv-scanner, gitleaks, semgrep."
     statement: "Gate 1 approves installing django-otp, pytest, pytest-django, pytest-playwright, axe-playwright-python, ruff, pyright and mutmut, and running osv-scanner, gitleaks and semgrep in CI."
+
+  # --- Gate 2 (2026-11-21): owner answered "Setuju semua" to the plan and its two open questions ---
+  - id: D-020
+    type: decision
+    version: 1
+    status: active
+    topic: 4
+    answer: "Setuju semua"
+    recommendation: "Pembulatan tagihan prorata: dibulatkan ke Rp 1.000 terdekat. Contoh: masuk tanggal 21 dengan sewa Rp 1.500.000 sebulan menjadi Rp 500.000."
+    statement: "A prorated first invoice is rounded to the nearest Rp 1.000, half up."
+
+  - id: D-021
+    type: decision
+    version: 1
+    status: active
+    topic: 7
+    answer: "Setuju semua"
+    recommendation: "Pasang paket qrcode supaya Staff cukup memindai kode QR saat mendaftarkan authenticator."
+    statement: "The qrcode package is added so TOTP enrolment shows a scannable QR code next to the text secret."
