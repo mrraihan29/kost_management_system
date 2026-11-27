@@ -71,7 +71,10 @@ def _wait_for_waiting_lock(timeout=8.0):
 
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
-    STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    },
 )
 @skipUnless(connection.vendor == "postgresql", "Real PostgreSQL required for row-lock contention")
 class PostgresConcurrencyTests(TransactionTestCase):

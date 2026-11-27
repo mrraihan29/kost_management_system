@@ -54,7 +54,10 @@ def create_test_image(name="test.jpg", size=(100, 100)):
 
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
-    STATICFILES_STORAGE="django.contrib.staticfiles.storage.StaticFilesStorage",
+    STORAGES={
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    },
 )
 class FullBusinessProcessTest(TestCase):
     """
