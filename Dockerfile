@@ -37,8 +37,12 @@ RUN mkdir -p /app/logs
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/health/ || exit 1
 
-# 9. SEC-16: migrasi sekali di entrypoint, lalu Gunicorn
+# 9. SEC-16: migrasi sekali di entrypoint, lalu Gunicorn (non-root user)
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+ && useradd --create-home --shell /bin/sh appuser \
+ && mkdir -p /app/media \
+ && chown -R appuser:appuser /app/logs /app/staticfiles /app/media
+USER appuser
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

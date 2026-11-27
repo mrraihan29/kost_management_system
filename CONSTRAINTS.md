@@ -26,7 +26,7 @@ Read before writing code. Never weaken this file to make a change pass.
 | Static analysis | No high findings | `semgrep scan --config p/default --config p/django --error` | CI |
 | Django | No issues, deploy checks clean | `uv run python manage.py check --deploy` | CI |
 | Migrations | None missing | `uv run python manage.py makemigrations --check --dry-run` | CI |
-| Ledger | Every active R- has a ticket and a test | `uv run <naobi-sdlc>/scripts/ledger_check.py docs/ledger.yaml --gate design --require tickets,tests` | CI |
+| Ledger | Every active R- has a ticket and a test | `uv run scripts/ledger_check.py docs/ledger.yaml --gate design --require tickets,tests` | CI |
 
 ## Project numbers
 

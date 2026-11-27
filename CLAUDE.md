@@ -8,7 +8,7 @@ Rent collection for three kost locations (Owner, Staff, Tenants), live at https:
 - Types: `uv run pyright`
 - Unit tests (one file): `uv run pytest <path>`; all: `uv run pytest`
 - E2E: `uv run pytest e2e`
-- Ledger check: `uv run ~/.claude/plugins/cache/naobi/naobi-sdlc/0.1.0/scripts/ledger_check.py docs/ledger.yaml --gate design`
+- Ledger check: `uv run scripts/ledger_check.py docs/ledger.yaml --gate design`
 - Django checks: `uv run python manage.py check`; full suite takes about 20 seconds
 
 ## Boundaries
