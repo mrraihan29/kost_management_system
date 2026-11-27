@@ -3,7 +3,6 @@
 Rent collection for three kost locations (Owner, Staff, Tenants), live at https://ekm.web.id. Stack: Django 6.1, PostgreSQL 15+, Tailwind CSS, no JS framework (`docs/adr/0001-stack.md`).
 
 ## Commands
-Django is still 5.0 on Python 3.11 until EKM-13.
 - Install: `uv sync`
 - Format + lint: `uv run ruff check` and `uv run ruff format --check`
 - Types: `uv run pyright`
