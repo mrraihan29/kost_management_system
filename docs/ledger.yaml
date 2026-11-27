@@ -673,3 +673,11 @@ entries:
     answer: "ya pasang django-types sebagai dependensi dev untuk pyright"
     recommendation: "Pasang django-types sebagai dependensi dev supaya pyright mengenal tipe Django; tidak ikut ke image production."
     statement: "django-types is added to the dev dependency group so pyright can check Django code; it never ships in the production image."
+
+  - id: D-023
+    type: decision
+    version: 1
+    status: active
+    topic: 11
+    answer: "Pyright strict for new modules; legacy modules stay basic until their logic moves into a new module. I approve rewording exception X-1 to say that, recorded as D-023 in the ledger."
+    statement: "Pyright strict mode applies to new modules; legacy modules stay in basic mode until their logic moves into a new module (updates CONSTRAINTS.md exception X-1)."

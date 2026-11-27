@@ -51,7 +51,7 @@ Read before writing code. Never weaken this file to make a change pass.
 
 | ID | Rule | Path | Reason | Owner | Expires |
 |---|---|---|---|---|---|
-| X-1 | Pyright strict | modules untouched since 2026-11-14 | Legacy code is typed as it is changed, not in one pass | Raihan | when each module is next changed |
+| X-1 | Pyright strict | legacy modules | Strict applies to new modules; legacy modules stay basic until their logic moves into a new module (D-023) | Raihan | when each legacy module's logic moves into a new module |
 
 ## Definition of Done (standing)
 

@@ -24,3 +24,11 @@ Django is still 5.0 on Python 3.11 until EKM-13.
 - `docs/design/REPORT.md`: design, flows, security, test strategy
 - `docs/ledger.yaml`: requirements (R-) and decisions (D-)
 - Plane project EKM: roadmap EKM-1 to EKM-10, build tickets from Plan
+
+## Agent skills
+
+### Issue tracker
+Plane project EKM via MCP. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+Single-context (`GLOSSARY.md` and `docs/adr/`). See `docs/agents/domain.md`.
