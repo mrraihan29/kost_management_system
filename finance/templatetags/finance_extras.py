@@ -8,7 +8,7 @@ def sub(value, arg):
     """Mengurangi value dengan arg"""
     try:
         return int(value) - int(arg)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return 0
 
 

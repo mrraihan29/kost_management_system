@@ -67,7 +67,7 @@ def admin_dashboard(request):
                 invoices = invoices.filter(contract__room__kost_location=location_obj)
                 rooms = rooms.filter(kost_location=location_obj)
                 location_name = f"Lokasi: {location_obj.name}"
-            except (KostLocation.DoesNotExist, ValueError, TypeError):
+            except KostLocation.DoesNotExist, ValueError, TypeError:
                 location_name = "Semua Lokasi (Error ID)"
         else:
             # Default: Lihat Semua
@@ -154,7 +154,7 @@ def admin_dashboard(request):
 
     try:
         selected_loc_int = int(selected_location_id) if selected_location_id else None
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         selected_loc_int = None
 
     context = {

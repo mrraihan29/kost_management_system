@@ -26,7 +26,7 @@ def ktp_upload_path(instance, filename):
 
 class Tenant(models.Model):
     if TYPE_CHECKING:
-        contracts: RelatedManager["TenantContract"]
+        contracts: RelatedManager[TenantContract]
 
     full_name = models.CharField(max_length=200)
     phone_number = models.CharField(max_length=20)
@@ -44,7 +44,7 @@ class Tenant(models.Model):
 class TenantContract(models.Model):
     if TYPE_CHECKING:
         id: int
-        invoices: RelatedManager["Invoice"]
+        invoices: RelatedManager[Invoice]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="contracts")
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="contracts")

@@ -36,7 +36,7 @@ def operation_cost_upload_path(instance, filename):
 class Invoice(models.Model):
     if TYPE_CHECKING:
         id: int
-        payments: RelatedManager["Payment"]
+        payments: RelatedManager[Payment]
 
     # Mengambil Status dari State Diagram (Phase 2)
     STATUS_CHOICES = [

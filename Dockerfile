@@ -1,5 +1,5 @@
-# 1. Python ringan (slim). Versi naik di EKM-13.
-FROM python:3.11-slim
+# 1. Python ringan (slim).
+FROM python:3.14-slim
 
 # 2. uv dari image resminya, versi dipatok
 COPY --from=ghcr.io/astral-sh/uv:0.7.7 /uv /uvx /bin/

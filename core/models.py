@@ -25,10 +25,10 @@ class KostLocation(models.Model):
 
 class Room(models.Model):
     if TYPE_CHECKING:
-        contracts: RelatedManager["TenantContract"]
+        contracts: RelatedManager[TenantContract]
         # set by the dashboard views (prefetch to_attr)
-        active_contracts: list["TenantContract"]
-        active_contract: "TenantContract | None"
+        active_contracts: list[TenantContract]
+        active_contract: TenantContract | None
 
     kost_location = models.ForeignKey(KostLocation, on_delete=models.PROTECT, related_name="rooms")
     room_number = models.CharField(max_length=20)  # Cth: "A-101"

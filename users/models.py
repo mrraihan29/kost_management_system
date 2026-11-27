@@ -9,7 +9,7 @@ from core.models import KostLocation
 # 1. Custom User Model (Pengganti User bawaan)
 class User(AbstractUser):
     if TYPE_CHECKING:
-        admin_profile: "AdminProfile"
+        admin_profile: AdminProfile
 
     # Kita bisa tambah field global di sini jika perlu,
     # tapi untuk sekarang default AbstractUser sudah cukup
