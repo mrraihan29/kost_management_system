@@ -48,7 +48,7 @@ norecursedirs = [".git", ".venv", "venv", "node_modules", "graphify-out", ".impe
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-extend-exclude = ["*/migrations/*", "graphify-out", ".impeccable", ".commandcode"]
+extend-exclude = ["*/migrations/*", "graphify-out", ".impeccable", ".commandcode", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "DJ"]
