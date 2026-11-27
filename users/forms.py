@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 
 from core.models import KostLocation
 
-from .models import User
+from .models import AdminProfile, User
 
 
 class StaffCreationForm(UserCreationForm):
@@ -27,6 +27,16 @@ class StaffCreationForm(UserCreationForm):
         # Styling field bawaan UserCreationForm
         for field in self.fields:
             self.fields[field].widget.attrs.update({"class": "form-control-clean"})
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.is_staff = True  # Wajib: Tandai sebagai Staff agar bisa login dashboard
+        if commit:
+            user.save()
+            AdminProfile.objects.create(
+                user=user, assigned_location=self.cleaned_data["assigned_location"]
+            )
+        return user
 
 
 class StaffUpdateForm(forms.ModelForm):
@@ -62,3 +72,11 @@ class StaffUpdateForm(forms.ModelForm):
         # Pre-fill lokasi dari AdminProfile
         if self.instance and hasattr(self.instance, "admin_profile"):
             self.fields["assigned_location"].initial = self.instance.admin_profile.assigned_location
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit:
+            profile, _ = AdminProfile.objects.get_or_create(user=user)
+            profile.assigned_location = self.cleaned_data["assigned_location"]
+            profile.save()
+        return user

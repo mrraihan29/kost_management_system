@@ -2,8 +2,10 @@ from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.shortcuts import get_object_or_404, redirect, render
 
+from core.scoping import location_for
+
 from .forms import StaffCreationForm, StaffUpdateForm
-from .models import AdminProfile, User
+from .models import User
 
 
 # Decorator Keamanan: Hanya Superuser yang boleh masuk sini
@@ -32,18 +34,11 @@ def staff_create(request):
     if request.method == "POST":
         form = StaffCreationForm(request.POST)
         if form.is_valid():
-            # 1. Simpan User (Username & Password)
-            user = form.save(commit=False)
-            user.is_staff = True  # Wajib: Tandai sebagai Staff agar bisa login dashboard
-            user.save()
-
-            # 2. Simpan Profil & Lokasi
-            location = form.cleaned_data["assigned_location"]
-            AdminProfile.objects.create(user=user, assigned_location=location)
-
+            user = form.save()
+            location = location_for(user)
             messages.success(
                 request,
-                f"Admin baru '{user.username}' berhasil dibuat untuk lokasi {location.name}.",
+                f"Admin baru '{user.username}' berhasil dibuat untuk lokasi {location.name if location else '-'}.",
             )
             return redirect("staff_list")
     else:
@@ -63,13 +58,6 @@ def staff_update(request, pk):
         form = StaffUpdateForm(request.POST, instance=staff_user)
         if form.is_valid():
             user = form.save()
-
-            # Update lokasi di AdminProfile
-            location = form.cleaned_data["assigned_location"]
-            profile, created = AdminProfile.objects.get_or_create(user=user)
-            profile.assigned_location = location
-            profile.save()
-
             messages.success(request, f"Data admin '{user.username}' berhasil diperbarui.")
             return redirect("staff_list")
     else:

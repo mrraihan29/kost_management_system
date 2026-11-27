@@ -329,7 +329,7 @@ class FullBusinessProcessTest(TestCase):
                 "description": "",
             },
         )
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 404)
         self.loc_kana.refresh_from_db()
         self.assertNotEqual(self.loc_kana.name, "Hacked")
 
@@ -427,7 +427,7 @@ class FullBusinessProcessTest(TestCase):
                 "capacity": 1,
             },
         )
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 404)
         kana_room.refresh_from_db()
         self.assertNotEqual(kana_room.price_monthly, Decimal("9999999"))
 
@@ -753,7 +753,7 @@ class FullBusinessProcessTest(TestCase):
         )
         # Admin Ancol tries to access Kana invoice
         resp = self.admin_ancol_client.get(reverse("invoice_detail", args=[invoice.pk]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 404)
 
     def test_phase6_09_management_command_update_overdue(self):
         """F-44: update_overdue command changes BELUM_LUNAS → TELAT_BAYAR."""
@@ -1012,7 +1012,7 @@ class FullBusinessProcessTest(TestCase):
         )
         # Admin Ancol tries to approve Kana payment
         resp = self.admin_ancol_client.post(reverse("verify_payment", args=[payment.pk, "approve"]))
-        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 404)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, "MENUNGGU_VERIFIKASI")  # Not changed
 

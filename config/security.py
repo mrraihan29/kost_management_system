@@ -14,6 +14,8 @@ from django.conf import settings
 from django.core.cache import cache
 from django.http import FileResponse, Http404, HttpResponseForbidden
 
+from core.scoping import NoLocation, location_for, scoped
+
 security_logger = logging.getLogger("security")
 
 
@@ -161,6 +163,16 @@ def serve_protected_media(request, path):
             )
             return HttpResponseForbidden("Akses ditolak.")
 
+    if is_staff:
+        try:
+            user_location = location_for(request.user)
+        except NoLocation as exc:
+            raise Http404 from exc
+        if user_location is not None and not _staff_owns_media(
+            request.user, folder, clean_path.replace(os.sep, "/")
+        ):
+            raise Http404
+
     # Serve file dengan content type yang tepat
     response = FileResponse(open(real_file_path, "rb"))
 
@@ -169,6 +181,23 @@ def serve_protected_media(request, path):
     response["Cache-Control"] = "private, no-store"
 
     return response
+
+
+def _staff_owns_media(user, folder, db_path):
+    from finance.models import OperationCost, Payment
+    from tenants.models import MaintenanceTicket, Tenant
+
+    targets = {
+        "ktp_private": (Tenant, "ktp_photo", "contracts__room__kost_location"),
+        "payment_proofs": (Payment, "payment_proof_file", "invoice__contract__room__kost_location"),
+        "operation_costs": (OperationCost, "proof_file", "kost_location"),
+        "maintenance_tickets": (MaintenanceTicket, "photo", "contract__room__kost_location"),
+    }
+    target = targets.get(folder)
+    if target is None:
+        return False
+    model, field_name, location_path = target
+    return scoped(model.objects.filter(**{field_name: db_path}), user, location_path).exists()
 
 
 # ──────────────────────────────────────────────
@@ -197,43 +226,3 @@ def log_action(request, action, target, detail=""):
         target,
         detail,
     )
-
-
-# ──────────────────────────────────────────────
-# B-01: Location Access Helpers (DRY)
-# ──────────────────────────────────────────────
-
-
-def get_user_location(user):
-    """
-    Ambil assigned_location dari user.
-    Returns KostLocation instance atau None.
-    """
-    if user.is_superuser:
-        return None  # Superuser = akses global
-    if hasattr(user, "admin_profile") and user.admin_profile.assigned_location:
-        return user.admin_profile.assigned_location
-    return None
-
-
-def filter_by_location(queryset, user, location_field="kost_location"):
-    """
-    Filter queryset berdasarkan lokasi user.
-    Superuser → tanpa filter. Admin biasa → filter ke lokasinya.
-    Admin tanpa lokasi → empty queryset.
-
-    Args:
-        queryset: Django QuerySet
-        user: User instance
-        location_field: Nama field/lookup ke KostLocation (e.g., 'kost_location',
-                       'contract__room__kost_location', 'room__kost_location')
-
-    Returns:
-        Filtered QuerySet
-    """
-    if user.is_superuser:
-        return queryset
-    location = get_user_location(user)
-    if location:
-        return queryset.filter(**{location_field: location})
-    return queryset.none()

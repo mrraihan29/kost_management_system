@@ -18,6 +18,7 @@ from openpyxl.styles import Font
 
 from config.security import check_rate_limit, log_action, record_failed_attempt, reset_rate_limit
 from core.models import KostLocation, Room
+from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from tenants.models import MaintenanceTicket, TenantContract
 
 from .forms import (
@@ -212,20 +213,13 @@ def verify_payment(request, payment_id, action):
     """
     Logika Verifikasi (Approve/Reject) FR-03
     """
-    payment = get_object_or_404(Payment, id=payment_id)
+    payment = get_scoped_or_404(
+        Payment.objects.select_related("invoice"),
+        request.user,
+        "invoice__contract__room__kost_location",
+        id=payment_id,
+    )
     invoice = payment.invoice
-
-    # Security: Cek kepemilikan lokasi (F-01 fix)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(
-                    request, "Anda tidak memiliki akses untuk memverifikasi pembayaran ini."
-                )
-                return redirect("dashboard")
-        else:
-            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
-            return redirect("dashboard")
 
     # F-03 fix: Validasi action
     if action not in ("approve", "reject"):
@@ -313,13 +307,7 @@ def invoice_list(request):
 
     # 2. SECURITY FILTER (BUG FIX)
     # Admin biasa HANYA boleh melihat tagihan di lokasinya
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            user_location = request.user.admin_profile.assigned_location
-            invoices = invoices.filter(contract__room__kost_location=user_location)
-        else:
-            # Admin tanpa lokasi = tidak lihat apa-apa
-            invoices = invoices.none()
+    invoices = scoped(invoices, request.user, "contract__room__kost_location")
 
     # 3. Filter by Status
     if status_filter:
@@ -351,17 +339,9 @@ def invoice_detail(request, pk):
     """
     Halaman Detail Tagihan & Input Listrik (Admin)
     """
-    invoice = get_object_or_404(Invoice, pk=pk)
-
-    # Security: Cek kepemilikan lokasi (A-SEC-04)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke tagihan ini.")
-                return redirect("invoice_list")
-        else:
-            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
-            return redirect("dashboard")
+    invoice = get_scoped_or_404(
+        Invoice.objects.all(), request.user, "contract__room__kost_location", pk=pk
+    )
 
     # Cek apakah sudah ada catatan listrik?
     electricity = ElectricityReading.objects.filter(invoice=invoice).first()
@@ -432,11 +412,7 @@ def operation_list(request):
     )
 
     # Filter Lokasi (Security: Admin Ancol cuma lihat Ancol)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            costs = costs.filter(kost_location=request.user.admin_profile.assigned_location)
-        else:
-            costs = costs.none()
+    costs = scoped(costs, request.user, "kost_location")
 
     total_expenses = costs.aggregate(Sum("amount"))["amount__sum"] or 0
 
@@ -469,17 +445,16 @@ def operation_create(request):
     Form Tambah Biaya Baru
     """
     # W8: hanya superuser atau staff dengan lokasi yang boleh mencatat pengeluaran
-    if not request.user.is_superuser:
-        if not request.user.is_staff:
-            messages.error(
-                request, "Akses ditolak. Hanya admin/staff yang dapat mencatat pengeluaran."
-            )
-            return redirect("dashboard")
-        if not (
-            hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location
-        ):
-            messages.error(request, "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun.")
-            return redirect("dashboard")
+    try:
+        user_location = location_for(request.user)
+    except NoLocation:
+        msg = (
+            "Akses ditolak. Hanya admin/staff yang dapat mencatat pengeluaran."
+            if not request.user.is_staff
+            else "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun."
+        )
+        messages.error(request, msg)
+        return redirect("dashboard")
 
     if request.method == "POST":
         form = OperationCostForm(request.POST, request.FILES)
@@ -488,12 +463,8 @@ def operation_create(request):
             cost.admin = request.user  # Catat siapa yang input
 
             # Security: Jika bukan superuser, paksa lokasi sesuai admin
-            if (
-                not request.user.is_superuser
-                and hasattr(request.user, "admin_profile")
-                and request.user.admin_profile.assigned_location
-            ):
-                cost.kost_location = request.user.admin_profile.assigned_location
+            if user_location is not None:
+                cost.kost_location = user_location
 
             cost.save()
             messages.success(request, "Pengeluaran berhasil dicatat.")
@@ -501,17 +472,11 @@ def operation_create(request):
     else:
         form = OperationCostForm()
         # G-01 fix: Filter dropdown lokasi untuk admin biasa
-        if (
-            not request.user.is_superuser
-            and hasattr(request.user, "admin_profile")
-            and request.user.admin_profile.assigned_location
-        ):
+        if user_location is not None:
             cast(
                 ModelChoiceField, form.fields["kost_location"]
-            ).queryset = KostLocation.objects.filter(
-                pk=request.user.admin_profile.assigned_location.pk
-            )
-            form.fields["kost_location"].initial = request.user.admin_profile.assigned_location
+            ).queryset = KostLocation.objects.filter(pk=user_location.pk)
+            form.fields["kost_location"].initial = user_location
 
     return render(
         request, "finance/operation_form.html", {"form": form, "title": "Catat Pengeluaran"}
@@ -523,28 +488,16 @@ def operation_update(request, pk):
     """
     Form Edit Biaya Operasional (B-CRUD-02)
     """
-    cost = get_object_or_404(OperationCost, pk=pk)
-
-    # Security: Cek kepemilikan lokasi
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if cost.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke data ini.")
-                return redirect("operation_list")
-        else:
-            return redirect("dashboard")
+    cost = get_scoped_or_404(OperationCost.objects.all(), request.user, "kost_location", pk=pk)
+    user_location = location_for(request.user)
 
     if request.method == "POST":
         form = OperationCostForm(request.POST, request.FILES, instance=cost)
         if form.is_valid():
             updated_cost = form.save(commit=False)
             # Security: Jika bukan superuser, paksa lokasi sesuai admin
-            if (
-                not request.user.is_superuser
-                and hasattr(request.user, "admin_profile")
-                and request.user.admin_profile.assigned_location
-            ):
-                updated_cost.kost_location = request.user.admin_profile.assigned_location
+            if user_location is not None:
+                updated_cost.kost_location = user_location
             updated_cost.save()
             messages.success(request, "Data pengeluaran berhasil diperbarui.")
             return redirect("operation_list")
@@ -562,16 +515,7 @@ def operation_delete(request, pk):
     """
     Hapus Biaya Operasional (B-CRUD-02)
     """
-    cost = get_object_or_404(OperationCost, pk=pk)
-
-    # Security: Cek kepemilikan lokasi
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if cost.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke data ini.")
-                return redirect("operation_list")
-        else:
-            return redirect("dashboard")
+    cost = get_scoped_or_404(OperationCost.objects.all(), request.user, "kost_location", pk=pk)
 
     cost.delete()
     # SEC-12: Audit log deletion
@@ -590,16 +534,9 @@ def print_receipt(request, pk):
     """
     Halaman Cetak Kwitansi (Hanya untuk yang LUNAS)
     """
-    invoice = get_object_or_404(Invoice, pk=pk)
-
-    # Security: Cek kepemilikan lokasi (A-SEC-05)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if invoice.contract.room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke kwitansi ini.")
-                return redirect("invoice_list")
-        else:
-            return redirect("dashboard")
+    invoice = get_scoped_or_404(
+        Invoice.objects.all(), request.user, "contract__room__kost_location", pk=pk
+    )
 
     # Security: Hanya boleh cetak jika sudah LUNAS
     if invoice.status != "LUNAS":
@@ -687,14 +624,8 @@ def admin_ticket_list(request):
     rooms = Room.objects.all().order_by("room_number")
 
     # 3. Security Filter (Lokasi)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            user_loc = request.user.admin_profile.assigned_location
-            tickets = tickets.filter(contract__room__kost_location=user_loc)
-            rooms = rooms.filter(kost_location=user_loc)
-        else:
-            tickets = tickets.none()
-            rooms = rooms.none()
+    tickets = scoped(tickets, request.user, "contract__room__kost_location")
+    rooms = scoped(rooms, request.user, "kost_location")
 
     # 4. Filter Status (URL ?status=...)
     status_filter = request.GET.get("status")
@@ -726,16 +657,9 @@ def admin_ticket_update(request, pk):
     """
     Update Status Tiket & Catat Tanggal Selesai
     """
-    ticket = get_object_or_404(MaintenanceTicket, pk=pk)
-
-    # Security: Cek kepemilikan lokasi (A-SEC-06)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if ticket.contract.room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke tiket ini.")
-                return redirect("ticket_list")
-        else:
-            return redirect("dashboard")
+    ticket = get_scoped_or_404(
+        MaintenanceTicket.objects.all(), request.user, "contract__room__kost_location", pk=pk
+    )
 
     if request.method == "POST":
         new_status = request.POST.get("status")
@@ -822,21 +746,16 @@ def finance_report(request):
     # Filter Lokasi (Logic Security + Logic Pilihan User)
     location_label = "Semua Lokasi"
 
-    if not request.user.is_superuser:
-        # W2/BQ-10: fail closed — hanya staff dengan assigned_location yang boleh lihat laporan
-        if (
-            request.user.is_staff
-            and hasattr(request.user, "admin_profile")
-            and request.user.admin_profile.assigned_location
-        ):
-            user_loc = request.user.admin_profile.assigned_location
-            invoices = invoices.filter(contract__room__kost_location=user_loc)
-            costs = costs.filter(kost_location=user_loc)
-            location_label = user_loc.name
-            # Hide field lokasi di form nanti via template logic
-        else:
-            messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
-            return redirect("dashboard")
+    try:
+        user_loc = location_for(request.user)
+    except NoLocation:
+        messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
+        return redirect("dashboard")
+
+    if user_loc is not None:
+        invoices = invoices.filter(contract__room__kost_location=user_loc)
+        costs = costs.filter(kost_location=user_loc)
+        location_label = user_loc.name
     elif selected_location:
         # Jika Superuser memilih lokasi tertentu
         invoices = invoices.filter(contract__room__kost_location=selected_location)
@@ -924,19 +843,15 @@ def export_finance_excel(request):
         "kost_location", "admin"
     )
 
-    if not request.user.is_superuser:
-        # W2/BQ-10: fail closed untuk non-staff / staff tanpa lokasi
-        if (
-            request.user.is_staff
-            and hasattr(request.user, "admin_profile")
-            and request.user.admin_profile.assigned_location
-        ):
-            loc = request.user.admin_profile.assigned_location
-            invoices = invoices.filter(contract__room__kost_location=loc)
-            costs = costs.filter(kost_location=loc)
-        else:
-            messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
-            return redirect("dashboard")
+    try:
+        loc = location_for(request.user)
+    except NoLocation:
+        messages.error(request, "Anda tidak memiliki akses ke laporan keuangan.")
+        return redirect("dashboard")
+
+    if loc is not None:
+        invoices = invoices.filter(contract__room__kost_location=loc)
+        costs = costs.filter(kost_location=loc)
     elif loc_id:
         invoices = invoices.filter(contract__room__kost_location_id=loc_id)
         costs = costs.filter(kost_location_id=loc_id)
@@ -1043,16 +958,7 @@ def generate_invoices_bulk(request):
         active_contracts = TenantContract.objects.filter(is_active=True)
 
         # A-DATA-04 fix: Filter berdasarkan lokasi admin
-        if not request.user.is_superuser:
-            if (
-                hasattr(request.user, "admin_profile")
-                and request.user.admin_profile.assigned_location
-            ):
-                active_contracts = active_contracts.filter(
-                    room__kost_location=request.user.admin_profile.assigned_location
-                )
-            else:
-                active_contracts = active_contracts.none()
+        active_contracts = scoped(active_contracts, request.user, "room__kost_location")
 
         created_count = 0
         skipped_count = 0

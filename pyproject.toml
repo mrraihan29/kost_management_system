@@ -62,5 +62,5 @@ exclude = ["**/migrations", "**/__pycache__"]
 pythonVersion = "3.14"
 typeCheckingMode = "basic"
 # Strict for modules created from EKM-12 on (CONSTRAINTS.md exception X-1).
-strict = ["config/settings_test.py", "config/tests_settings.py"]
+strict = ["config/settings_test.py", "config/tests_settings.py", "core/scoping.py", "core/tests/test_scoping.py"]
 reportMissingModuleSource = false

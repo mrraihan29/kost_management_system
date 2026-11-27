@@ -5,11 +5,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Sum
 from django.forms import ModelChoiceField
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.models import KostLocation, Room
+from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from finance.models import Invoice, Payment
 from finance.services import sync_overdue_invoice_statuses
 from tenants.models import TenantContract
@@ -46,22 +47,20 @@ def admin_dashboard(request):
     selected_location_id = request.GET.get("location")  # Ambil dari URL ?location=1
 
     # --- LOGIKA FILTER UTAMA ---
-    if not request.user.is_superuser:
-        # KONDISI 1: ADMIN BIASA (Dipaksa ke lokasinya)
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            user_location = request.user.admin_profile.assigned_location
+    try:
+        user_location = location_for(request.user)
+    except NoLocation:
+        invoices = invoices.none()
+        rooms = rooms.none()
+        location_name = "Tidak Ada Lokasi"
+    else:
+        if user_location is not None:
+            # KONDISI 1: ADMIN BIASA (Dipaksa ke lokasinya)
             invoices = invoices.filter(contract__room__kost_location=user_location)
             rooms = rooms.filter(kost_location=user_location)
             location_name = user_location.name
-        else:
-            invoices = invoices.none()
-            rooms = rooms.none()
-            location_name = "Tidak Ada Lokasi"
-
-    else:
-        # KONDISI 2: SUPERUSER
-        if selected_location_id and selected_location_id != "":
-            # Jika Superuser MEMILIH lokasi tertentu
+        elif selected_location_id and selected_location_id != "":
+            # KONDISI 2: SUPERUSER MEMILIH lokasi tertentu
             try:
                 location_obj = KostLocation.objects.get(id=selected_location_id)
                 invoices = invoices.filter(contract__room__kost_location=location_obj)
@@ -70,7 +69,7 @@ def admin_dashboard(request):
             except KostLocation.DoesNotExist, ValueError, TypeError:
                 location_name = "Semua Lokasi (Error ID)"
         else:
-            # Default: Lihat Semua
+            # Default Superuser: Lihat Semua
             location_name = "Semua Lokasi (Global)"
 
     # --- HITUNG KPI (Otomatis menyesuaikan filter di atas) ---
@@ -175,12 +174,12 @@ def location_list(request):
     """
     Halaman Daftar Lokasi (Hanya untuk Superuser)
     """
-    if not request.user.is_superuser:
-        # Jika admin biasa coba akses list, lempar langsung ke edit punya dia
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            return redirect("location_update", pk=request.user.admin_profile.assigned_location.id)
-        else:
-            return redirect("dashboard")  # Admin tanpa lokasi
+    try:
+        user_location = location_for(request.user)
+    except NoLocation:
+        return redirect("dashboard")
+    if user_location is not None:
+        return redirect("location_update", pk=user_location.pk)
 
     locations = KostLocation.objects.all()
     return render(request, "core/location_list.html", {"locations": locations})
@@ -191,18 +190,7 @@ def location_update(request, pk):
     """
     Halaman Edit Lokasi & Tarif
     """
-    location = get_object_or_404(KostLocation, pk=pk)
-
-    # Security Check: Admin biasa dilarang edit lokasi orang lain
-    if not request.user.is_superuser:
-        if (
-            not hasattr(request.user, "admin_profile")
-            or request.user.admin_profile.assigned_location != location
-        ):
-            messages.error(
-                request, "Anda tidak memiliki akses untuk mengubah pengaturan lokasi ini."
-            )
-            return redirect("dashboard")
+    location = get_scoped_or_404(KostLocation.objects.all(), request.user, "pk", pk=pk)
 
     if request.method == "POST":
         form = KostLocationForm(request.POST, instance=location)
@@ -241,11 +229,7 @@ def room_list(request):
     )
 
     # Filter Lokasi (Security)
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            rooms = rooms.filter(kost_location=request.user.admin_profile.assigned_location)
-        else:
-            rooms = rooms.none()
+    rooms = scoped(rooms, request.user, "kost_location")
 
     rooms = list(rooms)
 
@@ -280,45 +264,35 @@ def room_create(request):
     """
     Form Tambah Kamar (B-CRUD-04)
     """
-    if not request.user.is_superuser:
-        if not request.user.is_staff:
-            messages.error(request, "Akses ditolak. Hanya admin/staff yang dapat menambah kamar.")
-            return redirect("dashboard")
-        if (
-            not hasattr(request.user, "admin_profile")
-            or not request.user.admin_profile.assigned_location
-        ):
-            messages.error(request, "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun.")
-            return redirect("dashboard")
+    try:
+        user_location = location_for(request.user)
+    except NoLocation:
+        msg = (
+            "Akses ditolak. Hanya admin/staff yang dapat menambah kamar."
+            if not request.user.is_staff
+            else "Akses ditolak. Akun admin belum ditugaskan ke lokasi manapun."
+        )
+        messages.error(request, msg)
+        return redirect("dashboard")
 
     if request.method == "POST":
         form = RoomForm(request.POST)
         if form.is_valid():
             room = form.save(commit=False)
             # Security: Jika bukan superuser, paksa lokasi
-            if (
-                not request.user.is_superuser
-                and hasattr(request.user, "admin_profile")
-                and request.user.admin_profile.assigned_location
-            ):
-                room.kost_location = request.user.admin_profile.assigned_location
+            if user_location is not None:
+                room.kost_location = user_location
             room.save()
             messages.success(request, f"Kamar {room.room_number} berhasil ditambahkan.")
             return redirect("room_list")
     else:
         form = RoomForm()
         # Pre-fill lokasi untuk admin biasa
-        if (
-            not request.user.is_superuser
-            and hasattr(request.user, "admin_profile")
-            and request.user.admin_profile.assigned_location
-        ):
-            form.fields["kost_location"].initial = request.user.admin_profile.assigned_location
+        if user_location is not None:
+            form.fields["kost_location"].initial = user_location
             cast(
                 ModelChoiceField, form.fields["kost_location"]
-            ).queryset = KostLocation.objects.filter(
-                pk=request.user.admin_profile.assigned_location.pk
-            )
+            ).queryset = KostLocation.objects.filter(pk=user_location.pk)
 
     return render(request, "core/room_form.html", {"form": form, "title": "Tambah Kamar"})
 
@@ -328,42 +302,24 @@ def room_update(request, pk):
     """
     Edit Data Kamar (B-CRUD-04)
     """
-    room = get_object_or_404(Room, pk=pk)
-
-    # Security: Cek kepemilikan lokasi
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke kamar ini.")
-                return redirect("room_list")
-        else:
-            return redirect("dashboard")
+    room = get_scoped_or_404(Room.objects.all(), request.user, "kost_location", pk=pk)
+    user_location = location_for(request.user)
 
     if request.method == "POST":
         form = RoomForm(request.POST, instance=room)
         if form.is_valid():
             updated_room = form.save(commit=False)
-            if (
-                not request.user.is_superuser
-                and hasattr(request.user, "admin_profile")
-                and request.user.admin_profile.assigned_location
-            ):
-                updated_room.kost_location = request.user.admin_profile.assigned_location
+            if user_location is not None:
+                updated_room.kost_location = user_location
             updated_room.save()
             messages.success(request, f"Kamar {room.room_number} berhasil diperbarui.")
             return redirect("room_list")
     else:
         form = RoomForm(instance=room)
-        if (
-            not request.user.is_superuser
-            and hasattr(request.user, "admin_profile")
-            and request.user.admin_profile.assigned_location
-        ):
+        if user_location is not None:
             cast(
                 ModelChoiceField, form.fields["kost_location"]
-            ).queryset = KostLocation.objects.filter(
-                pk=request.user.admin_profile.assigned_location.pk
-            )
+            ).queryset = KostLocation.objects.filter(pk=user_location.pk)
 
     return render(
         request, "core/room_form.html", {"form": form, "title": f"Edit Kamar {room.room_number}"}
@@ -376,16 +332,7 @@ def room_delete(request, pk):
     """
     Hapus Kamar (B-CRUD-04) — Hanya jika tidak ada kontrak aktif
     """
-    room = get_object_or_404(Room, pk=pk)
-
-    # Security
-    if not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses ke kamar ini.")
-                return redirect("room_list")
-        else:
-            return redirect("dashboard")
+    room = get_scoped_or_404(Room.objects.all(), request.user, "kost_location", pk=pk)
 
     # Cek apakah kamar sedang ditempati
     if room.contracts.filter(is_active=True).exists():

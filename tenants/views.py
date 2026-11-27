@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic.edit import CreateView, UpdateView
 
 from config.security import log_action
+from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from finance.models import Invoice
 from users.models import User
 
@@ -22,19 +23,16 @@ from .models import Tenant, TenantContract
 
 
 class StaffWithLocationRequiredMixin(UserPassesTestMixin):
-    """Hanya superuser atau staff dengan assigned_location yang boleh mengakses."""
+    """Hanya Owner atau Staff dengan lokasi yang boleh mengakses."""
 
     request: HttpRequest
 
     def test_func(self):
-        user = cast(User, self.request.user)
-        if user.is_superuser:
+        try:
+            location_for(cast(User, self.request.user))
             return True
-        return (
-            user.is_staff
-            and hasattr(user, "admin_profile")
-            and user.admin_profile.assigned_location is not None
-        )
+        except NoLocation:
+            return False
 
     def handle_no_permission(self):
         messages.error(self.request, "Akses ditolak. Hanya admin/staff yang ditugaskan lokasi.")
@@ -58,19 +56,8 @@ def tenant_list(request):
         )
     ).order_by("-created_at")
 
-    # 2. CEK HAK AKSES (Logic Baru)
-    # Jika dia BUKAN Superuser, kita filter datanya
-    if not request.user.is_superuser:
-        # Cek apakah dia punya profil admin dan lokasi yang ditugaskan
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            user_location = request.user.admin_profile.assigned_location
-
-            # Filter penghuni yang punya kontrak di lokasi admin tersebut
-            # (Menggunakan lookup double underscore __)
-            tenants = tenants.filter(contracts__room__kost_location=user_location).distinct()
-        else:
-            # Jika admin tidak punya lokasi (error akun), jangan tampilkan apa-apa
-            tenants = tenants.none()
+    # 2. CEK HAK AKSES
+    tenants = scoped(tenants, request.user, "contracts__room__kost_location").distinct()
 
     # Hitung KPI sebelum filter pencarian agar angka tetap konstan
     total_tenants = tenants.count()
@@ -124,16 +111,15 @@ class TenantUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         """W9/BQ-7: admin biasa hanya bisa edit tenant dengan kontrak AKTIF di lokasinya.
         Tenant historis (tanpa kontrak aktif) tetap terlihat di list, tapi read-only."""
         qs = super().get_queryset()
-        user = cast(User, self.request.user)
-        if not user.is_superuser:
-            if hasattr(user, "admin_profile") and user.admin_profile.assigned_location:
-                location = user.admin_profile.assigned_location
-                qs = qs.filter(
-                    contracts__room__kost_location=location,
-                    contracts__is_active=True,
-                ).distinct()
-            else:
-                qs = qs.none()
+        try:
+            location = location_for(cast(User, self.request.user))
+        except NoLocation:
+            return qs.none()
+        if location is not None:
+            return qs.filter(
+                contracts__room__kost_location=location,
+                contracts__is_active=True,
+            ).distinct()
         return qs
 
     def get_context_data(self, **kwargs):
@@ -149,20 +135,12 @@ def tenant_checkout(request, pk):
     """
     Aksi Check-Out: Menonaktifkan kontrak sewa penghuni
     """
-    tenant = get_object_or_404(Tenant, pk=pk)
+    tenant = get_scoped_or_404(
+        Tenant.objects.all(), request.user, "contracts__room__kost_location", pk=pk
+    )
 
     # Cari kontrak yang masih aktif
     active_contract = tenant.contracts.filter(is_active=True).first()
-
-    # Security: Cek kepemilikan lokasi
-    if active_contract and not request.user.is_superuser:
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if active_contract.room.kost_location != request.user.admin_profile.assigned_location:
-                messages.error(request, "Anda tidak memiliki akses untuk checkout penghuni ini.")
-                return redirect("tenant_list")
-        else:
-            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
-            return redirect("tenant_list")
 
     if active_contract:
         # B-FLOW-01 fix: Cek apakah ada tagihan belum lunas sebelum checkout
@@ -206,18 +184,9 @@ def tenant_delete(request, pk):
     Hapus Data Penghuni (B-CRUD-01)
     Hanya bisa jika tidak punya kontrak aktif dan tidak ada invoice unpaid
     """
-    tenant = get_object_or_404(Tenant, pk=pk)
-
-    # A-02 fix: Cek akses lokasi sebelum operasi delete
-    if not request.user.is_superuser:
-        tenant_locations = tenant.contracts.values_list("room__kost_location", flat=True).distinct()
-        if hasattr(request.user, "admin_profile") and request.user.admin_profile.assigned_location:
-            if request.user.admin_profile.assigned_location_id not in tenant_locations:
-                messages.error(request, "Anda tidak memiliki akses untuk menghapus penghuni ini.")
-                return redirect("tenant_list")
-        else:
-            messages.error(request, "Akun Anda belum ditugaskan ke lokasi manapun.")
-            return redirect("tenant_list")
+    tenant = get_scoped_or_404(
+        Tenant.objects.all(), request.user, "contracts__room__kost_location", pk=pk
+    )
 
     # Cek apakah punya kontrak aktif
     if tenant.contracts.filter(is_active=True).exists():
@@ -269,9 +238,11 @@ class TenantContractCreateView(
         sampai product owner memutuskan siapa yang boleh memulai.
         """
         tenant = get_object_or_404(Tenant, pk=self.kwargs["pk"])
-        user = cast(User, self.request.user)
-        if not user.is_superuser:
-            location = user.admin_profile.assigned_location
+        try:
+            location = location_for(cast(User, self.request.user))
+        except NoLocation as exc:
+            raise Http404("Tenant tidak ditemukan.") from exc
+        if location is not None:
             has_contracts = tenant.contracts.exists()
             has_own_history = tenant.contracts.filter(room__kost_location=location).exists()
             if has_contracts and not has_own_history:
