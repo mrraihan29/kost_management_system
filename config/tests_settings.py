@@ -17,3 +17,7 @@ def test_production_settings_use_storages_with_compressed_manifest():
     assert prod.STORAGES["staticfiles"]["BACKEND"] == (
         "whitenoise.storage.CompressedManifestStaticFilesStorage"
     )
+
+
+def test_intentional_ci_red_proof():
+    assert False, "Intentional failure to prove EKM-14 CI gate"
