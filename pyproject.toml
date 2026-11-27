@@ -3,7 +3,6 @@ name = "evy-kost-management"
 version = "0.1.0"
 description = "Rent collection for the Evy kost locations (Django)."
 requires-python = ">=3.14"
-# Versions are unchanged from the old requirements.txt; EKM-13 upgrades them.
 dependencies = [
     "asgiref==3.13.0",
     "dj-database-url==3.1.2",
@@ -21,7 +20,7 @@ dependencies = [
     "python-dotenv==1.2.4",
     "six==1.17.0",
     "sqlparse==0.6.1",
-    "tzdata==2025.2",
+    "tzdata==2026.6",
     "whitenoise==6.12.0",
 ]
 
