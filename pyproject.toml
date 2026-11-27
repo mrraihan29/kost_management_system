@@ -5,7 +5,7 @@ description = "Rent collection for the Evy kost locations (Django)."
 requires-python = ">=3.14"
 # Versions are unchanged from the old requirements.txt; EKM-13 upgrades them.
 dependencies = [
-    "asgiref==3.10.0",
+    "asgiref==3.13.0",
     "dj-database-url==3.1.2",
     "Django==6.1.3",
     "django-axes==9.1.0",
