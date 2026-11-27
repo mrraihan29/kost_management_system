@@ -664,3 +664,12 @@ entries:
     answer: "Setuju semua"
     recommendation: "Pasang paket qrcode supaya Staff cukup memindai kode QR saat mendaftarkan authenticator."
     statement: "The qrcode package is added so TOTP enrolment shows a scannable QR code next to the text secret."
+
+  - id: D-022
+    type: decision
+    version: 1
+    status: active
+    topic: 7
+    answer: "ya pasang django-types sebagai dependensi dev untuk pyright"
+    recommendation: "Pasang django-types sebagai dependensi dev supaya pyright mengenal tipe Django; tidak ikut ke image production."
+    statement: "django-types is added to the dev dependency group so pyright can check Django code; it never ships in the production image."

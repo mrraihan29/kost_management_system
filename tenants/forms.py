@@ -1,3 +1,5 @@
+from typing import cast
+
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -76,10 +78,12 @@ class TenantContractForm(forms.ModelForm):
         occupied_room_ids = TenantContract.objects.filter(is_active=True).values_list(
             "room_id", flat=True
         )
-        self.fields["room"].queryset = rooms_query.exclude(id__in=occupied_room_ids)
+        cast(forms.ModelChoiceField, self.fields["room"]).queryset = rooms_query.exclude(
+            id__in=occupied_room_ids
+        )
 
     def clean_room(self):
         room = self.cleaned_data.get("room")
-        if room and room not in self.fields["room"].queryset:
+        if room and room not in cast(forms.ModelChoiceField, self.fields["room"]).queryset:
             raise ValidationError("Kamar tidak valid atau tidak dapat diakses.")
         return room

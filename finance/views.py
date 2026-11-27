@@ -1,4 +1,5 @@
 import datetime
+from typing import cast
 
 import openpyxl
 from dateutil.relativedelta import relativedelta
@@ -8,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
+from django.forms import ModelChoiceField
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -504,7 +506,9 @@ def operation_create(request):
             and hasattr(request.user, "admin_profile")
             and request.user.admin_profile.assigned_location
         ):
-            form.fields["kost_location"].queryset = KostLocation.objects.filter(
+            cast(
+                ModelChoiceField, form.fields["kost_location"]
+            ).queryset = KostLocation.objects.filter(
                 pk=request.user.admin_profile.assigned_location.pk
             )
             form.fields["kost_location"].initial = request.user.admin_profile.assigned_location
@@ -943,6 +947,7 @@ def export_finance_excel(request):
 
     # --- SHEET 1: RINGKASAN ---
     ws1 = wb.active
+    assert ws1 is not None  # a new Workbook always has one sheet
     ws1.title = "Ringkasan Bulanan"
 
     # Header Style

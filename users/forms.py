@@ -18,7 +18,7 @@ class StaffCreationForm(UserCreationForm):
         widget=forms.Select(attrs={"class": "form-select shadow-none border-secondary"}),
     )
 
-    class Meta(UserCreationForm.Meta):
+    class Meta(UserCreationForm.Meta):  # pyright: ignore[reportAttributeAccessIssue]  (django-types omits Meta)
         model = User
         fields = ("username", "first_name", "last_name", "email")
 

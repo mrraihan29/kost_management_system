@@ -2,12 +2,18 @@ import os
 import secrets
 import string
 import uuid
+from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 
 from core.models import Room
+
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
+
+    from finance.models import Invoice
 
 
 # Fungsi utilitas untuk merename file KTP agar unik (Security NFR-02)
@@ -19,6 +25,9 @@ def ktp_upload_path(instance, filename):
 
 
 class Tenant(models.Model):
+    if TYPE_CHECKING:
+        contracts: RelatedManager["TenantContract"]
+
     full_name = models.CharField(max_length=200)
     phone_number = models.CharField(max_length=20)
     emergency_contact_phone = models.CharField(max_length=20)
@@ -33,6 +42,10 @@ class Tenant(models.Model):
 
 
 class TenantContract(models.Model):
+    if TYPE_CHECKING:
+        id: int
+        invoices: RelatedManager["Invoice"]
+
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="contracts")
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="contracts")
 
@@ -125,6 +138,11 @@ def ticket_upload_path(instance, filename):
 
 
 class MaintenanceTicket(models.Model):
+    if TYPE_CHECKING:
+        id: int
+
+        def get_status_display(self) -> str: ...
+
     STATUS_CHOICES = [
         ("PENDING", "Menunggu Respon"),
         ("PROSES", "Sedang Diperbaiki"),

@@ -32,6 +32,7 @@ dev = [
     "ruff",
     "pyright",
     "mutmut",
+    "django-types>=0.24.0",
 ]
 
 [tool.uv]
@@ -62,5 +63,5 @@ exclude = ["**/migrations", "**/__pycache__"]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
 # Strict for modules created from EKM-12 on (CONSTRAINTS.md exception X-1).
-strict = []
+strict = ["config/settings_test.py", "config/tests_settings.py"]
 reportMissingModuleSource = false

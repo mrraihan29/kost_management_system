@@ -1,8 +1,10 @@
 import re
+from typing import cast
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Sum
+from django.forms import ModelChoiceField
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -312,7 +314,9 @@ def room_create(request):
             and request.user.admin_profile.assigned_location
         ):
             form.fields["kost_location"].initial = request.user.admin_profile.assigned_location
-            form.fields["kost_location"].queryset = KostLocation.objects.filter(
+            cast(
+                ModelChoiceField, form.fields["kost_location"]
+            ).queryset = KostLocation.objects.filter(
                 pk=request.user.admin_profile.assigned_location.pk
             )
 
@@ -355,7 +359,9 @@ def room_update(request, pk):
             and hasattr(request.user, "admin_profile")
             and request.user.admin_profile.assigned_location
         ):
-            form.fields["kost_location"].queryset = KostLocation.objects.filter(
+            cast(
+                ModelChoiceField, form.fields["kost_location"]
+            ).queryset = KostLocation.objects.filter(
                 pk=request.user.admin_profile.assigned_location.pk
             )
 

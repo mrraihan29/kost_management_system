@@ -56,7 +56,7 @@ def check_rate_limit(request, key_prefix="pin_attempt", max_attempts=5, window=9
     attempts = cache.get(cache_key, 0)
     if attempts >= max_attempts:
         # Hitung sisa waktu blokir (TTL dari cache key)
-        ttl = cache.ttl(cache_key) if hasattr(cache, "ttl") else window
+        ttl = cache.ttl(cache_key) if hasattr(cache, "ttl") else window  # pyright: ignore[reportAttributeAccessIssue]  (redis-only, guarded by hasattr)
         return True, attempts, ttl
 
     return False, attempts, 0

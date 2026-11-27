@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -6,10 +8,12 @@ from core.models import KostLocation
 
 # 1. Custom User Model (Pengganti User bawaan)
 class User(AbstractUser):
+    if TYPE_CHECKING:
+        admin_profile: "AdminProfile"
+
     # Kita bisa tambah field global di sini jika perlu,
     # tapi untuk sekarang default AbstractUser sudah cukup
     # (username, password, email, first_name, last_name, is_staff, is_superuser)
-    pass
 
 
 # 2. Admin Profile (Untuk Admin Kost - Relasi OneToOne)

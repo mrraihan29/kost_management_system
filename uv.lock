@@ -213,6 +213,18 @@ wheels = [
 ]
 
 [[package]]
+name = "django-types"
+version = "0.24.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "types-psycopg2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d7/7b/8e05b8631fa7de84038d4f24fa57e983107aff889a6d88a9c40a21e15d1c/django_types-0.24.0.tar.gz", hash = "sha256:af903de8b9ee963b7594459a7a20cb8eaaab176ae2b3244ecaa089e0c570b0d1", size = 208426, upload-time = "2026-04-22T22:19:01.999Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/ab/f5c37ecc08c396df62579246597796697b58253c8b30206870e8d0f644d0/django_types-0.24.0-py3-none-any.whl", hash = "sha256:ddb478ca733e0dde5475118dd59ab340156980f9659fd92de2083326ae96100a", size = 379436, upload-time = "2026-04-22T22:19:03.368Z" },
+]
+
+[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -248,6 +260,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "django-types" },
     { name = "mutmut" },
     { name = "pyright" },
     { name = "pytest" },
@@ -279,6 +292,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "django-types", specifier = ">=0.24.0" },
     { name = "mutmut" },
     { name = "pyright" },
     { name = "pytest" },
@@ -965,6 +979,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/00/21/39a76b01bd5eea82a04baaca7580e105d8c59450df03998345bb2cfb307b/textual-8.2.8.tar.gz", hash = "sha256:3f106a9fbc73e39dd266c9712432087de78a6d644084c7c241d6a25c3169115b", size = 1860502, upload-time = "2026-06-30T06:51:24.495Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/be/35261223d9416a0751cdff1c7b4a6f881387218a12d439fe22fefebc8c04/textual-8.2.8-py3-none-any.whl", hash = "sha256:267375fd402dc8d981457212efa71f0e3365fd17bba144ba9bb3ed7563cb374a", size = 731418, upload-time = "2026-06-30T06:51:26.364Z" },
+]
+
+[[package]]
+name = "types-psycopg2"
+version = "2.9.21.20261122"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/98/c4d772d148d8c048ec7ac5baecccadb74b80971f6e03b32101c9ba2e9e5f/types_psycopg2-2.9.21.20261122.tar.gz", hash = "sha256:4c045b8b0add828c75f00d7d602a5375ccd433521582af1a78bb153795e7d80c", size = 28016, upload-time = "2026-11-22T08:57:54.855Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/68/688d4b554aac5f59630f56c773acb27f3f48ccf4450556d275e500e0c1c4/types_psycopg2-2.9.21.20261122-py3-none-any.whl", hash = "sha256:2f8288d554d59c3091c4a5b781a087e52663866e4aadf3ab5aa7e4a7eb8bc5e8", size = 25080, upload-time = "2026-11-22T08:57:54.129Z" },
 ]
 
 [[package]]

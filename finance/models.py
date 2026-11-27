@@ -1,6 +1,7 @@
 import os
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -8,6 +9,9 @@ from django.db import models, transaction
 
 from core.models import KostLocation
 from tenants.models import TenantContract
+
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
 
 # --- Fungsi Utilitas Upload Path (Security NFR-02) ---
 
@@ -30,6 +34,10 @@ def operation_cost_upload_path(instance, filename):
 
 
 class Invoice(models.Model):
+    if TYPE_CHECKING:
+        id: int
+        payments: RelatedManager["Payment"]
+
     # Mengambil Status dari State Diagram (Phase 2)
     STATUS_CHOICES = [
         ("BELUM_LUNAS", "Belum Lunas"),
@@ -80,6 +88,9 @@ class Invoice(models.Model):
 
 
 class ElectricityReading(models.Model):
+    if TYPE_CHECKING:
+        invoice_id: int | None
+
     # Relasi 1-to-1: 1 Tagihan = 1 Catatan Listrik (Sesuai ERD)
     invoice = models.OneToOneField(
         Invoice, on_delete=models.CASCADE, related_name="electricity_reading"
@@ -128,6 +139,9 @@ class ElectricityReading(models.Model):
 
 
 class Payment(models.Model):
+    if TYPE_CHECKING:
+        id: int
+
     STATUS_CHOICES = [
         ("PENDING", "Menunggu Keputusan"),
         ("APPROVED", "Disetujui"),
@@ -154,6 +168,10 @@ class Payment(models.Model):
 
 
 class OperationCost(models.Model):
+    if TYPE_CHECKING:
+
+        def get_category_display(self) -> str: ...
+
     CATEGORY_CHOICES = [
         ("LISTRIK", "Listrik"),
         ("PAM", "PAM (Air)"),

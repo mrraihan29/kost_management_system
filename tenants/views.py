@@ -1,10 +1,12 @@
+from typing import cast
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.paginator import Paginator
 from django.db.models import Prefetch, Q
-from django.http import Http404
+from django.http import Http404, HttpRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -13,6 +15,7 @@ from django.views.generic.edit import CreateView, UpdateView
 
 from config.security import log_action
 from finance.models import Invoice
+from users.models import User
 
 from .forms import TenantContractForm, TenantForm
 from .models import Tenant, TenantContract
@@ -21,8 +24,10 @@ from .models import Tenant, TenantContract
 class StaffWithLocationRequiredMixin(UserPassesTestMixin):
     """Hanya superuser atau staff dengan assigned_location yang boleh mengakses."""
 
+    request: HttpRequest
+
     def test_func(self):
-        user = self.request.user
+        user = cast(User, self.request.user)
         if user.is_superuser:
             return True
         return (
@@ -119,7 +124,7 @@ class TenantUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
         """W9/BQ-7: admin biasa hanya bisa edit tenant dengan kontrak AKTIF di lokasinya.
         Tenant historis (tanpa kontrak aktif) tetap terlihat di list, tapi read-only."""
         qs = super().get_queryset()
-        user = self.request.user
+        user = cast(User, self.request.user)
         if not user.is_superuser:
             if hasattr(user, "admin_profile") and user.admin_profile.assigned_location:
                 location = user.admin_profile.assigned_location
@@ -264,7 +269,7 @@ class TenantContractCreateView(
         sampai product owner memutuskan siapa yang boleh memulai.
         """
         tenant = get_object_or_404(Tenant, pk=self.kwargs["pk"])
-        user = self.request.user
+        user = cast(User, self.request.user)
         if not user.is_superuser:
             location = user.admin_profile.assigned_location
             has_contracts = tenant.contracts.exists()
@@ -285,7 +290,7 @@ class TenantContractCreateView(
             )
             return redirect("tenant_list")
 
-        form.instance.tenant = tenant
+        cast(TenantContractForm, form).instance.tenant = tenant
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):

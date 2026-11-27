@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
+from typing import Any
 
 import dj_database_url
 from django.contrib.messages import constants as messages
@@ -117,7 +118,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # ──────────────────────────────────────────────
 
-DATABASES = {
+DATABASES: dict[str, Any] = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
