@@ -11,7 +11,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
 from django.forms import ModelChoiceField
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from openpyxl.styles import Font
@@ -30,6 +30,7 @@ from .forms import (
     ReportFilterForm,
 )
 from .models import ElectricityReading, Invoice, OperationCost, Payment
+from .portal import SESSION_CONTRACT_KEY, portal_contract
 from .services import sync_overdue_invoice_statuses
 
 
@@ -58,30 +59,26 @@ def public_payment_step1(request):
             pin = form.cleaned_data["pin"]
 
             # --- LOGIKA VALIDASI ---
-            # 1. Cari Kamar yang cocok (Lokasi & No Kamar)
             try:
-                room = Room.objects.get(kost_location=location, room_number__iexact=room_num)
-            except Room.DoesNotExist:
-                # SEC-01: Catat percobaan gagal
-                record_failed_attempt(request, key_prefix="pin_attempt", window=900)
-                messages.error(request, "Kamar tidak ditemukan di lokasi tersebut.")
-                return render(request, "finance/step1_pin.html", {"form": form})
-
-            # 2. Cari Kontrak Aktif di kamar itu dengan PIN yang cocok
-            try:
-                contract = TenantContract.objects.get(room=room, payment_pin=pin, is_active=True)
+                contract = TenantContract.objects.select_related("tenant", "room").get(
+                    room__kost_location=location,
+                    room__room_number__iexact=room_num,
+                    payment_pin=pin,
+                    is_active=True,
+                )
             except TenantContract.DoesNotExist:
-                # SEC-01: Catat percobaan gagal
+                # SEC-01: Catat percobaan gagal (pesan seragam cegah enumerasi kamar — T-001)
                 record_failed_attempt(request, key_prefix="pin_attempt", window=900)
-                messages.error(request, "PIN salah atau Kontrak tidak aktif.")
+                messages.error(request, "Lokasi, nomor kamar atau PIN salah.")
                 return render(request, "finance/step1_pin.html", {"form": form})
 
             # --- JIKA SUKSES ---
             # SEC-01: Reset counter karena berhasil
             reset_rate_limit(request, key_prefix="pin_attempt")
 
-            # Simpan ID kontrak di Session
-            request.session["verified_contract_id"] = contract.id
+            # T-003: Rotasi session id sebelum menyimpan sesi kontrak
+            request.session.cycle_key()
+            request.session[SESSION_CONTRACT_KEY] = contract.id
             request.session.set_expiry(1800)  # 30 menit
 
             # SEC-12: Log successful PIN authentication
@@ -89,7 +86,7 @@ def public_payment_step1(request):
                 request,
                 "PIN_AUTH_SUCCESS",
                 f"Contract #{contract.id}",
-                f"Tenant: {contract.tenant.full_name}, Room: {room.room_number}",
+                f"Tenant: {contract.tenant.full_name}, Room: {contract.room.room_number}",
             )
 
             messages.success(
@@ -108,12 +105,10 @@ def public_payment_step2(request):
     Langkah 2: Halaman Upload File
     """
     # Cek apakah user punya "tiket" di sakunya (Session)
-    contract_id = request.session.get("verified_contract_id")
-    if not contract_id:
+    contract = portal_contract(request)
+    if contract is None:
         messages.error(request, "Sesi habis. Silakan masukkan PIN ulang.")
         return redirect("public_payment_step1")
-
-    contract = get_object_or_404(TenantContract, id=contract_id, is_active=True)
     active_invoice = (
         Invoice.objects.filter(contract=contract)
         .exclude(status__in=["LUNAS", "MENUNGGU_VERIFIKASI"])
@@ -149,7 +144,7 @@ def public_payment_step2(request):
                 Invoice.objects.filter(pk=locked_invoice.pk).update(status="MENUNGGU_VERIFIKASI")
 
             # Hapus sesi (Selesai)
-            del request.session["verified_contract_id"]
+            request.session.pop(SESSION_CONTRACT_KEY, None)
 
             return render(request, "finance/success.html")
     else:
@@ -171,14 +166,11 @@ def public_payment_history(request):
     """
     Halaman Riwayat Pembayaran (Publik - Session Based)
     """
-    # 1. Cek Keamanan Sesi (Wajib sudah validasi PIN)
-    contract_id = request.session.get("verified_contract_id")
-    if not contract_id:
+    # 1. Cek Keamanan Sesi (Wajib sudah validasi PIN dan kontrak aktif)
+    contract = portal_contract(request)
+    if contract is None:
         messages.error(request, "Sesi habis. Silakan masukkan PIN ulang.")
         return redirect("public_payment_step1")
-
-    # 2. Ambil Data
-    contract = get_object_or_404(TenantContract, id=contract_id)
 
     # Ambil SEMUA invoice, urutkan dari yang terbaru
     invoices = Invoice.objects.filter(contract=contract).order_by("-billing_period_start")
@@ -201,8 +193,7 @@ def public_logout(request):
     """
     Logout Portal Publik — Hapus session penghuni (B-FLOW-04)
     """
-    if "verified_contract_id" in request.session:
-        del request.session["verified_contract_id"]
+    request.session.pop(SESSION_CONTRACT_KEY, None)
     messages.info(request, "Anda telah keluar. Silakan masukkan PIN untuk masuk kembali.")
     return redirect("public_payment_step1")
 
@@ -559,12 +550,10 @@ def public_report_create(request):
     Halaman Buat Laporan Kerusakan (Publik)
     """
     # Cek Sesi (Keamanan)
-    contract_id = request.session.get("verified_contract_id")
-    if not contract_id:
+    contract = portal_contract(request)
+    if contract is None:
         messages.error(request, "Sesi habis. Masukkan PIN ulang.")
         return redirect("public_payment_step1")
-
-    contract = get_object_or_404(TenantContract, id=contract_id)
 
     if request.method == "POST":
         form = MaintenanceForm(request.POST, request.FILES)
@@ -590,11 +579,9 @@ def public_report_list(request):
     """
     Halaman Riwayat Laporan Kerusakan (Publik)
     """
-    contract_id = request.session.get("verified_contract_id")
-    if not contract_id:
+    contract = portal_contract(request)
+    if contract is None:
         return redirect("public_payment_step1")
-
-    contract = get_object_or_404(TenantContract, id=contract_id)
     tickets = MaintenanceTicket.objects.filter(contract=contract).order_by("-created_at")
 
     # H-03 fix: Pagination untuk riwayat laporan

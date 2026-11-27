@@ -144,8 +144,12 @@ def serve_protected_media(request, path):
     folder = clean_path.split(os.sep)[0] if os.sep in clean_path else clean_path.split("/")[0]
     access_rule = MEDIA_ACCESS_RULES.get(folder, "staff_only")  # Default: staff only
 
+    from finance.portal import portal_contract
+
     is_staff = request.user.is_authenticated and request.user.is_staff
-    has_session = bool(request.session.get("verified_contract_id"))
+    tenant_contract = (
+        None if (is_staff or access_rule == "staff_only") else portal_contract(request)
+    )
 
     if access_rule == "staff_only":
         if not is_staff:
@@ -157,21 +161,22 @@ def serve_protected_media(request, path):
             )
             return HttpResponseForbidden("Akses ditolak.")
     elif access_rule == "authenticated":
-        if not is_staff and not has_session:
+        if not is_staff and tenant_contract is None:
             security_logger.warning(
                 "Unauthorized media access attempt: %s (IP: %s)", path, get_client_ip(request)
             )
             return HttpResponseForbidden("Akses ditolak.")
 
+    db_path = clean_path.replace(os.sep, "/")
     if is_staff:
         try:
             user_location = location_for(request.user)
         except NoLocation as exc:
             raise Http404 from exc
-        if user_location is not None and not _staff_owns_media(
-            request.user, folder, clean_path.replace(os.sep, "/")
-        ):
+        if user_location is not None and not _staff_owns_media(request.user, folder, db_path):
             raise Http404
+    elif tenant_contract is not None and not _tenant_owns_media(tenant_contract, folder, db_path):
+        raise Http404
 
     # Serve file dengan content type yang tepat
     response = FileResponse(open(real_file_path, "rb"))
@@ -181,6 +186,19 @@ def serve_protected_media(request, path):
     response["Cache-Control"] = "private, no-store"
 
     return response
+
+
+def _tenant_owns_media(contract, folder, db_path):
+    from finance.models import Payment
+    from tenants.models import MaintenanceTicket
+
+    if folder == "payment_proofs":
+        return Payment.objects.filter(
+            payment_proof_file=db_path, invoice__contract=contract
+        ).exists()
+    if folder == "maintenance_tickets":
+        return MaintenanceTicket.objects.filter(photo=db_path, contract=contract).exists()
+    return False
 
 
 def _staff_owns_media(user, folder, db_path):
