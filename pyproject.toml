@@ -12,7 +12,7 @@ dependencies = [
     "django-csp==4.0",
     "et_xmlfile==2.0.0",
     "Faker==38.0.0",
-    "gunicorn==23.0.0",
+    "gunicorn==27.0.1",
     "openpyxl==3.1.5",
     "packaging==25.0",
     "pillow==12.0.0",
