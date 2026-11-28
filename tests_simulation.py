@@ -688,7 +688,7 @@ class FullBusinessProcessTest(TestCase):
         self.assertContains(resp, "Billing Tenant")
 
     def test_phase6_05b_invoice_list_auto_sync_overdue_status(self):
-        """Invoice list auto-updates BELUM_LUNAS overdue invoices to TELAT_BAYAR."""
+        """R-024: invoice_list performs no status write on GET; status stays BELUM_LUNAS."""
         tenant, contract = self._setup_billing_data()
         invoice = Invoice.objects.create(
             contract=contract,
@@ -704,7 +704,7 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(resp.status_code, 200)
 
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, "TELAT_BAYAR")
+        self.assertEqual(invoice.status, "BELUM_LUNAS")
 
     def test_phase6_06_invoice_detail_and_electricity(self):
         """F-26: Input electricity meter reading updates invoice total."""
@@ -787,7 +787,7 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     def test_phase6_09_management_command_update_overdue(self):
-        """F-44: update_overdue command changes BELUM_LUNAS → TELAT_BAYAR."""
+        """F-44 / R-024: mark_late_invoices command changes BELUM_LUNAS → TELAT_BAYAR."""
         tenant, contract = self._setup_billing_data()
         invoice = Invoice.objects.create(
             contract=contract,
@@ -798,7 +798,7 @@ class FullBusinessProcessTest(TestCase):
             total_amount=Decimal("1500000"),
             status="BELUM_LUNAS",
         )
-        call_command("update_overdue")
+        call_command("mark_late_invoices")
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, "TELAT_BAYAR")
 

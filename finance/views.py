@@ -33,7 +33,6 @@ from .forms import (
 )
 from .models import ElectricityReading, Invoice, OperationCost, Payment
 from .portal import SESSION_CONTRACT_KEY, portal_contract
-from .services import sync_overdue_invoice_statuses
 
 
 def public_payment_step1(request):
@@ -295,8 +294,6 @@ def invoice_list(request):
     """
     Halaman Daftar Semua Tagihan (Admin) - FIXED SECURITY
     """
-    sync_overdue_invoice_statuses()
-
     status_filter = request.GET.get("status")
     search_query = request.GET.get("q")
 
@@ -440,7 +437,7 @@ def operation_list(request):
         "-incurred_date"
     )
 
-    # Filter Lokasi (Security: Admin Ancol cuma lihat Ancol)
+    # Scope operating costs to Staff's assigned location
     costs = scoped(costs, request.user, "kost_location")
 
     total_expenses = costs.aggregate(Sum("amount"))["amount__sum"] or 0

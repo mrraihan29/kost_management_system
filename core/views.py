@@ -14,7 +14,6 @@ from django.views.decorators.http import require_POST
 from core.models import OWNER_ONLY_LOCATION_FIELDS, KostLocation, Room
 from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from finance.models import Invoice, Payment
-from finance.services import sync_overdue_invoice_statuses
 from tenants.models import TenantContract
 
 from .forms import KostLocationForm, KostLocationOwnerForm, RoomForm, audit_location_setting_changes
@@ -38,8 +37,6 @@ def admin_dashboard(request):
     """
     Dashboard Utama (Dengan Filter Superuser & Peta Visual)
     """
-    sync_overdue_invoice_statuses()
-
     # Base Query
     invoices = Invoice.objects.all()
     rooms = Room.objects.all().order_by("room_number")
