@@ -1,6 +1,8 @@
+import re
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 if TYPE_CHECKING:
@@ -9,8 +11,31 @@ if TYPE_CHECKING:
     from tenants.models import TenantContract
 
 
+OWNER_ONLY_LOCATION_FIELDS: tuple[str, ...] = (
+    "billing_mode",
+    "bills_electricity",
+    "bank_name",
+    "bank_account_number",
+    "bank_account_holder",
+)
+
+
+def validate_bank_account_number(value: str) -> None:
+    """Validate Indonesian bank account numbers (blank or 6-20 digits with optional spaces)."""
+    if not value.strip():
+        return
+    if not re.fullmatch(r"[0-9 ]+", value) or not (6 <= sum(ch.isdigit() for ch in value) <= 20):
+        raise ValidationError(
+            "Nomor rekening hanya boleh berisi angka dan spasi, sebanyak 6 sampai 20 digit."
+        )
+
+
 # Create your models here.
 class KostLocation(models.Model):
+    class BillingMode(models.TextChoices):
+        PER_ROOM_CYCLE = "per_room_cycle", "Siklus per kamar"
+        SIMULTANEOUS = "simultaneous", "Serentak per bulan"
+
     name = models.CharField(max_length=100)
     address = models.TextField()
     description = models.TextField(blank=True, null=True)  # noqa: DJ001 schema change deferred to EKM-19 (location migration)
@@ -18,6 +43,20 @@ class KostLocation(models.Model):
     electricity_rate_per_kwh = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal("1500.00")
     )
+    billing_mode = models.CharField(
+        max_length=20,
+        choices=BillingMode.choices,
+        default=BillingMode.SIMULTANEOUS,
+    )
+    bills_electricity = models.BooleanField(default=False)
+    bank_name = models.CharField(max_length=100, blank=True, default="")
+    bank_account_number = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        validators=[validate_bank_account_number],
+    )
+    bank_account_holder = models.CharField(max_length=120, blank=True, default="")
 
     def __str__(self):
         return self.name

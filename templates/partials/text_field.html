@@ -1,6 +1,6 @@
 {% comment %}
 Text field (DESIGN.md).
-Params: id, name, label, type, value, placeholder (example only), hint, error, disabled, required, autocomplete.
+Params: id, name, label, type, value, placeholder (example only), hint, error, disabled, required, autocomplete, inputmode, raw_identifier.
 {% endcomment %}
 <div>
   <label for="{{ id }}" class="block text-sm font-semibold text-ink">{{ label }}</label>
@@ -11,6 +11,8 @@ Params: id, name, label, type, value, placeholder (example only), hint, error, d
     id="{{ id }}"
     name="{{ name }}"
     type="{{ type|default:'text' }}"
+    {% if inputmode %}inputmode="{{ inputmode }}"{% endif %}
+    {% if raw_identifier %}autocorrect="off" autocapitalize="none" spellcheck="false"{% endif %}
     {% if value %}value="{{ value }}"{% endif %}
     {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
     {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}

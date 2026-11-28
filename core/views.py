@@ -5,18 +5,19 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Sum
 from django.forms import ModelChoiceField
-from django.http import Http404
+from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from core.models import KostLocation, Room
+from core.models import OWNER_ONLY_LOCATION_FIELDS, KostLocation, Room
 from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from finance.models import Invoice, Payment
 from finance.services import sync_overdue_invoice_statuses
 from tenants.models import TenantContract
 
-from .forms import KostLocationForm, RoomForm
+from .forms import KostLocationForm, KostLocationOwnerForm, RoomForm, audit_location_setting_changes
 
 
 # --- VIEW 1: LANDING PAGE (YANG HILANG) ---
@@ -188,24 +189,38 @@ def location_list(request):
 
 @login_required(login_url="/accounts/login/")
 def location_update(request, pk):
-    """
-    Halaman Edit Lokasi & Tarif
-    """
+    """Edit location details; only Owner may edit billing mode and bank fields."""
     location = get_scoped_or_404(KostLocation.objects.all(), request.user, "pk", pk=pk)
+    is_owner = bool(request.user.is_superuser)
+    back_url = reverse("location_list" if is_owner else "dashboard")
 
+    if (
+        not is_owner
+        and request.method == "POST"
+        and any(field in request.POST for field in OWNER_ONLY_LOCATION_FIELDS)
+    ):
+        return HttpResponseForbidden(
+            "Hanya Pemilik yang dapat mengubah pengaturan penagihan atau rekening."
+        )
+
+    form_cls = KostLocationOwnerForm if is_owner else KostLocationForm
     if request.method == "POST":
-        form = KostLocationForm(request.POST, instance=location)
+        before = {field: getattr(location, field) for field in OWNER_ONLY_LOCATION_FIELDS}
+        form = form_cls(request.POST, instance=location)
         if form.is_valid():
-            form.save()
+            saved = form.save()
+            if is_owner:
+                audit_location_setting_changes(request, saved, before)
             messages.success(request, f"Pengaturan '{location.name}' berhasil diperbarui.")
-            # Kembali ke halaman yang sesuai role
-            if request.user.is_superuser:
-                return redirect("location_list")
-            return redirect("dashboard")
+            return redirect(back_url)
     else:
-        form = KostLocationForm(instance=location)
+        form = form_cls(instance=location)
 
-    return render(request, "core/location_form.html", {"form": form, "location": location})
+    return render(
+        request,
+        "core/location_form.html",
+        {"form": form, "location": location, "back_url": back_url},
+    )
 
 
 # --- ROOM MANAGEMENT (B-CRUD-04) ---
