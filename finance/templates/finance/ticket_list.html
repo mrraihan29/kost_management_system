@@ -64,7 +64,7 @@
             <tbody>
                 {% for ticket in tickets %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4 text-muted small" data-label="Tanggal">{{ ticket.created_at|date:"d M Y" }}</td>
+                    <td class="ps-4 text-muted small" data-label="Tanggal">{{ ticket.created_at|date:"j F Y" }}</td>
                     <td data-label="Pelapor">
                         <div class="fw-bold text-dark">{{ ticket.contract.tenant.full_name }}</div>
                         <span class="badge bg-light text-dark border border-secondary">{{ ticket.contract.room.room_number }}</span>

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Pengaturan Lokasi{% endblock %}
 
@@ -34,7 +34,7 @@
                     <small class="text-uppercase text-muted fw-bold" style="font-size: 0.7rem;">Tarif Listrik</small>
                     <div class="d-flex align-items-center mt-1">
                         <i class="fas fa-bolt text-warning me-2"></i>
-                        <h4 class="mb-0 fw-bold">Rp {{ loc.electricity_rate_per_kwh|intcomma }} <span class="text-muted fs-6 fw-normal">/ KWH</span></h4>
+                        <h4 class="mb-0 fw-bold">{{ loc.electricity_rate_per_kwh|rupiah }} <span class="text-muted fs-6 fw-normal">/ KWH</span></h4>
                     </div>
                 </div>
 

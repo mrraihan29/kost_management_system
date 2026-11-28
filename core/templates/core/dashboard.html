@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load humanize %}
 {% load finance_extras %}
 
 {% block title %}Dashboard Admin{% endblock %}
@@ -88,7 +87,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted small fw-bold text-uppercase mb-1">Pemasukan Bulan Ini (Kas)</p>
-                        <h2 class="fw-bold mb-0 mt-2" style="color: var(--color-success);">Rp {{ income_this_month|intcomma }}</h2>
+                        <h2 class="fw-bold mb-0 mt-2" style="color: var(--color-success);">{{ income_this_month|rupiah }}</h2>
                     </div>
                     <div class="p-3 rounded-circle" style="background-color: var(--color-success-bg);">
                         <i class="fas fa-wallet fa-2x" style="color: var(--color-success);"></i>
@@ -176,12 +175,12 @@
                         <span class="badge bg-light text-dark border">{{ invoice.contract.room.room_number }}</span>
                     </td>
                     <td data-label="Jatuh Tempo">
-                        {{ invoice.due_date|date:"d M Y" }}
+                        {{ invoice.due_date|date:"j F Y" }}
                         {% if invoice.status == 'TELAT_BAYAR' %}
                             <br><span class="text-danger small fw-bold" style="font-size: 0.7rem;">LEWAT JATUH TEMPO</span>
                         {% endif %}
                     </td>
-                    <td class="fw-bold" data-label="Total" style="color: var(--color-text-main);">Rp {{ invoice.total_amount|intcomma }}</td>
+                    <td class="fw-bold" data-label="Total" style="color: var(--color-text-main);">{{ invoice.total_amount|rupiah }}</td>
                     <td data-label="Status">
                         {% if invoice.status == 'MENUNGGU_VERIFIKASI' %}
                             <span class="badge-pill badge-warning">Verifikasi</span>

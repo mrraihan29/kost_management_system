@@ -91,7 +91,7 @@
                     <td class="text-muted small" data-label="Tgl Masuk">
                         {% with contract=tenant.contracts.last %}
                             {% if contract %}
-                                {{ contract.start_date|date:"d M Y" }}
+                                {{ contract.start_date|date:"j F Y" }}
                             {% else %}
                                 -
                             {% endif %}

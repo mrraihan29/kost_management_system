@@ -1,5 +1,5 @@
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -257,7 +257,7 @@
                 <div class="meta-info">
                     <div>No: #INV-{{ invoice.id }}</div>
                     <!-- Tanggal Bayar/Verifikasi -->
-                    <div>Tgl: {% if payment %}{{ payment.verified_at|date:"d M Y" }}{% else %}{% now "d M Y" %}{% endif %}</div>
+                    <div>Tgl: {% if payment %}{{ payment.verified_at|date:"j F Y" }}{% else %}{% now "j F Y" %}{% endif %}</div>
                 </div>
             </div>
         </div>
@@ -277,7 +277,7 @@
                     Sewa {{ invoice.contract.room.kost_location.name }} Kamar <strong>{{ invoice.contract.room.room_number }}</strong>
                     <br>
                     <span style="font-size: 9pt; color: #555;">
-                        Periode: {{ invoice.billing_period_start|date:"d M Y" }} s/d {{ invoice.due_date|date:"d M Y" }}
+                        Periode: {{ invoice.billing_period_start|date:"j F Y" }} s/d {{ invoice.due_date|date:"j F Y" }}
                     </span>
                 </div>
             </div>
@@ -285,7 +285,7 @@
             <!-- Kotak Uang -->
             <div class="amount-container">
                 <div class="amount-box">
-                    Rp {{ invoice.total_amount|intcomma }}
+                    {{ invoice.total_amount|rupiah }}
                 </div>
             </div>
         </div>
@@ -296,7 +296,7 @@
                 *Kwitansi ini adalah bukti pembayaran yang sah dan digenerate otomatis oleh sistem Evy Kost.
             </div>
             <div class="signature">
-                <div class="sign-place">{{ invoice.contract.room.kost_location.name }}, {% now "d M Y" %}</div>
+                <div class="sign-place">{{ invoice.contract.room.kost_location.name }}, {% now "j F Y" %}</div>
                 <div style="font-size: 9pt; margin-bottom: 30px;">Diterima Oleh,</div>
                 
                 <div class="sign-line">{{ admin_name }}</div>

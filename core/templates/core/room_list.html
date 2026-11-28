@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Daftar Kamar{% endblock %}
 
@@ -35,7 +35,7 @@
                 <tr style="border-bottom: 1px solid var(--color-border);">
                     <td class="ps-4 fw-bold" data-label="No. Kamar">{{ room.room_number }}</td>
                     <td data-label="Lokasi">{{ room.kost_location.name }}</td>
-                    <td data-label="Harga/Bulan">Rp {{ room.price_monthly|intcomma }}</td>
+                    <td data-label="Harga/Bulan">{{ room.price_monthly|rupiah }}</td>
                     <td data-label="Kapasitas">{{ room.capacity }} orang</td>
                     <td data-label="Listrik">
                         {% if room.is_token_electricity %}

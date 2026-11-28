@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from openpyxl.styles import Font
 
 from config.security import check_rate_limit, log_action, record_failed_attempt, reset_rate_limit
+from core.formats import month_name
 from core.models import KostLocation, Room
 from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from tenants.models import MaintenanceTicket, TenantContract
@@ -768,7 +769,7 @@ def finance_report(request):
 
         monthly_data.append(
             {
-                "month_name": datetime.date(1900, month, 1).strftime("%B"),
+                "month_name": month_name(month),
                 "income": float(income),
                 "expense": float(expense),
                 "profit": float(profit),
@@ -871,8 +872,7 @@ def export_finance_excel(request):
             costs.filter(incurred_date__month=month).aggregate(Sum("amount"))["amount__sum"] or 0
         )
         profit = income - expense
-        month_name = datetime.date(1900, month, 1).strftime("%B")
-        ws1.append([month_name, income, expense, profit])
+        ws1.append([month_name(month), income, expense, profit])
 
     # --- SHEET 2: DETAIL PEMASUKAN ---
     ws2 = wb.create_sheet(title="Rincian Pemasukan")
@@ -998,7 +998,7 @@ def generate_invoices_bulk(request):
         if created_count > 0:
             messages.success(
                 request,
-                f"Berhasil membuat {created_count} tagihan baru untuk periode {billing_start_base.strftime('%B %Y')}.",
+                f"Berhasil membuat {created_count} tagihan baru untuk periode {month_name(billing_start_base.month)} {billing_start_base.year}.",
             )
         else:
             messages.info(

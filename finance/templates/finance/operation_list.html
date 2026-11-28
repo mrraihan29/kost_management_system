@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Biaya Operasional{% endblock %}
 
@@ -20,13 +20,13 @@
     <div class="col-md-4">
         <div class="card-paper bg-white p-4">
             <h6 class="text-muted text-uppercase small fw-bold">Pengeluaran Bulan Ini</h6>
-            <h2 class="text-warning fw-bold mb-0 mt-2">Rp {{ monthly_expenses|intcomma }}</h2>
+            <h2 class="text-warning fw-bold mb-0 mt-2">{{ monthly_expenses|rupiah }}</h2>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card-paper bg-white p-4">
             <h6 class="text-muted text-uppercase small fw-bold">Total Pengeluaran (Seluruh)</h6>
-            <h2 class="text-danger fw-bold mb-0 mt-2">Rp {{ total_expenses|intcomma }}</h2>
+            <h2 class="text-danger fw-bold mb-0 mt-2">{{ total_expenses|rupiah }}</h2>
         </div>
     </div>
 </div>
@@ -48,13 +48,13 @@
             <tbody>
                 {% for cost in costs %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4" data-label="Tanggal">{{ cost.incurred_date|date:"d M Y" }}</td>
+                    <td class="ps-4" data-label="Tanggal">{{ cost.incurred_date|date:"j F Y" }}</td>
                     <td data-label="Kategori">
                         <span class="badge bg-light text-dark border">{{ cost.get_category_display }}</span>
                     </td>
                     <td class="text-muted small" data-label="Keterangan">{{ cost.description|truncatechars:50 }}</td>
                     <td class="small fw-bold" data-label="Lokasi">{{ cost.kost_location.name }}</td>
-                    <td class="fw-bold text-danger" data-label="Jumlah">Rp {{ cost.amount|intcomma }}</td>
+                    <td class="fw-bold text-danger" data-label="Jumlah">{{ cost.amount|rupiah }}</td>
                     <td class="pe-4 text-end cell-actions">
                         {% if cost.proof_file %}
                             <a href="{{ cost.proof_file.url }}" target="_blank" class="btn btn-sm btn-ink-outline" title="Lihat Nota">
