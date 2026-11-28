@@ -29,7 +29,7 @@ _STAFF_SPECS: tuple[NavItem, ...] = (
         "Tagihan",
         "invoice_list",
         "i-invoice",
-        frozenset({"invoice_list", "invoice_detail", "print_receipt", "invoice_generate_bulk"}),
+        frozenset({"invoice_list", "invoice_detail", "print_receipt", "issue_invoices"}),
     ),
     NavItem(
         "Penghuni & Kamar",

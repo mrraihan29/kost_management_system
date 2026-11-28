@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load finance_extras %}
+
+{% block title %}Terbitkan Tagihan · {{ location.name }}{% endblock %}
+
+{% block legacy_styles %}{% endblock %}
+{% block legacy_scripts %}{% endblock %}
+
+{% block content %}
+{% url 'invoice_list' as invoice_list_url %}
+<div class="max-w-2xl">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-bold leading-tight text-ink">Terbitkan tagihan · {{ location.name }}</h1>
+    {% include "partials/button.html" with label="Kembali" variant="secondary" href=invoice_list_url %}
+  </div>
+
+  {% if simultaneous_locations|length > 1 %}
+  <nav aria-label="Pilih lokasi" class="mt-6 flex flex-wrap gap-2">
+    {% for loc in simultaneous_locations %}
+    <a
+      href="?location={{ loc.pk }}&period={{ selected_period.key }}"
+      {% if loc.pk == location.pk %}aria-current="page"{% endif %}
+      class="inline-flex min-h-12 items-center rounded-control px-4 text-sm font-bold transition-colors {% if loc.pk == location.pk %}bg-enamel text-white{% else %}bg-white text-ink shadow-[inset_0_0_0_2px_#DDE2DD] hover:bg-porcelain{% endif %}"
+    >
+      {{ loc.name }}
+    </a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <nav aria-label="Pilih bulan tagihan" class="mt-6 grid grid-cols-2 gap-3">
+    {% for opt in period_options %}
+    <a
+      href="?{% if simultaneous_locations %}location={{ location.pk }}&{% endif %}period={{ opt.key }}"
+      {% if opt.key == selected_period.key %}aria-current="page"{% endif %}
+      class="flex min-h-12 flex-col justify-center rounded-control px-4 py-3 transition-colors {% if opt.key == selected_period.key %}bg-enamel text-white{% else %}bg-white text-ink shadow-[inset_0_0_0_2px_#7C8794] hover:bg-porcelain{% endif %}"
+    >
+      <span class="text-xs font-semibold {% if opt.key == selected_period.key %}text-white/85{% else %}text-ink-soft{% endif %}">{{ opt.caption }}</span>
+      <span class="text-base font-bold">{{ opt.label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  <section aria-labelledby="issue-summary-heading" class="mt-6 rounded-surface bg-white p-6 shadow-surface">
+    <h2 id="issue-summary-heading" class="text-xl font-bold text-ink tabular-nums">
+      {{ to_create_count }} tagihan akan dibuat
+    </h2>
+    <p class="mt-1 text-sm text-ink-soft tabular-nums">
+      Periode 1 {{ selected_period.label }}, jatuh tempo 11 {{ selected_period.label }}.
+      {% if to_create_count > 0 %}
+        Total sewa pokok {{ total_rent|rupiah }}.
+      {% endif %}
+    </p>
+
+    {% if to_create_count > 0 %}
+    <form method="post" action="{% url 'issue_invoices' %}" aria-labelledby="issue-summary-heading" class="mt-5">
+      {% csrf_token %}
+      <input type="hidden" name="period" value="{{ selected_period.key }}">
+      {% if simultaneous_locations %}
+      <input type="hidden" name="location" value="{{ location.pk }}">
+      {% endif %}
+      {% include "partials/button.html" with label="Terbitkan tagihan" variant="primary" type="submit" extra_class="w-full sm:w-auto" %}
+    </form>
+
+    <h3 class="mt-8 text-base font-bold text-ink">Kamar yang akan ditagih</h3>
+    <ul class="mt-3 divide-y divide-rule border-t border-rule">
+      {% for contract in to_create %}
+      <li class="flex items-center justify-between gap-3 py-3">
+        <div class="flex min-w-0 items-center gap-3">
+          {% include "partials/plate.html" with number=contract.room.room_number state="unpaid" size="md" %}
+          <div class="min-w-0">
+            <p class="truncate text-base font-semibold text-ink">{{ contract.tenant.full_name }}</p>
+            <p class="text-sm text-ink-soft">Kamar {{ contract.room.room_number }}</p>
+          </div>
+        </div>
+        <span class="shrink-0 text-base font-bold text-ink tabular-nums">{{ contract.monthly_rent_amount|rupiah }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-4 text-sm text-ink-soft">
+      Semua kontrak aktif di {{ location.name }} sudah memiliki tagihan untuk {{ selected_period.label }}, atau belum ada kontrak aktif.
+    </p>
+    <div class="mt-5">
+      {% include "partials/button.html" with label="Kembali ke Daftar Tagihan" variant="secondary" href=invoice_list_url %}
+    </div>
+    {% endif %}
+  </section>
+
+  {% if existing_rows %}
+  <section aria-labelledby="existing-heading" class="mt-8 rounded-surface bg-white p-6 shadow-surface">
+    <h2 id="existing-heading" class="text-base font-bold text-ink tabular-nums">
+      Kamar yang sudah memiliki tagihan ({{ existing_count }})
+    </h2>
+    <ul class="mt-3 divide-y divide-rule border-t border-rule">
+      {% for row in existing_rows %}
+      <li class="flex items-center justify-between gap-3 py-3">
+        <div class="flex min-w-0 items-center gap-3">
+          {% include "partials/plate.html" with number=row.invoice.contract.room.room_number state=row.plate_state size="md" %}
+          <div class="min-w-0">
+            <a href="{% url 'invoice_detail' row.invoice.pk %}" class="inline-flex min-h-11 items-center truncate text-base font-semibold text-enamel underline underline-offset-4 hover:text-enamel-deep">
+              {{ row.invoice.contract.tenant.full_name }}
+            </a>
+            <p class="text-sm text-ink-soft">{{ row.invoice.get_status_display }}</p>
+          </div>
+        </div>
+        <span class="shrink-0 text-base font-bold text-ink tabular-nums">{{ row.invoice.total_amount|rupiah }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

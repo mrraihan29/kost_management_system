@@ -1,16 +1,16 @@
 import datetime
+from decimal import Decimal
 from typing import cast
 
 import openpyxl
-from dateutil.relativedelta import relativedelta
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import IntegrityError, transaction
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.forms import ModelChoiceField
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -22,6 +22,7 @@ from core.models import KostLocation, Room
 from core.scoping import NoLocation, get_scoped_or_404, location_for, scoped
 from tenants.models import MaintenanceTicket, TenantContract
 
+from . import billing
 from .forms import (
     ElectricityForm,
     MaintenanceForm,
@@ -317,11 +318,27 @@ def invoice_list(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
+    can_issue_simultaneous = False
+    try:
+        user_location = location_for(request.user)
+    except NoLocation:
+        user_location = None
+    else:
+        if user_location is None:
+            can_issue_simultaneous = KostLocation.objects.filter(
+                billing_mode=KostLocation.BillingMode.SIMULTANEOUS
+            ).exists()
+        else:
+            can_issue_simultaneous = (
+                user_location.billing_mode == KostLocation.BillingMode.SIMULTANEOUS
+            )
+
     context = {
         "invoices": page_obj,
         "page_obj": page_obj,
         "search_query": search_query,
         "current_status": status_filter,
+        "can_issue_simultaneous": can_issue_simultaneous,
     }
     return render(request, "finance/invoice_list.html", context)
 
@@ -929,80 +946,111 @@ def export_finance_excel(request):
     return response
 
 
+_INVOICE_PLATE_STATE: dict[str, str] = {
+    "LUNAS": "paid",
+    "MENUNGGU_VERIFIKASI": "wait",
+    "TELAT_BAYAR": "late",
+}
+
+
+def _resolve_simultaneous_location(
+    request,
+) -> tuple[KostLocation, list[KostLocation]]:
+    """Resolve the target simultaneous location for Staff/Owner, or raise Http404."""
+    try:
+        user_location = location_for(request.user)
+    except NoLocation as exc:
+        raise Http404 from exc
+
+    if user_location is not None:
+        if user_location.billing_mode != KostLocation.BillingMode.SIMULTANEOUS:
+            raise Http404
+        return user_location, []
+
+    simultaneous_locations = list(
+        KostLocation.objects.filter(billing_mode=KostLocation.BillingMode.SIMULTANEOUS).order_by(
+            "name"
+        )
+    )
+    if not simultaneous_locations:
+        raise Http404
+
+    loc_param = (
+        request.POST.get("location") if request.method == "POST" else request.GET.get("location")
+    ) or ""
+    if loc_param:
+        matched = next((loc for loc in simultaneous_locations if str(loc.pk) == loc_param), None)
+        if matched is None:
+            raise Http404
+        return matched, simultaneous_locations
+
+    return simultaneous_locations[0], simultaneous_locations
+
+
 @login_required(login_url="/accounts/login/")
-def generate_invoices_bulk(request):
-    """
-    Fitur: Generate Tagihan Massal via Tombol Dashboard
-    """
+def issue_invoices(request):
+    """Preview and issue monthly invoices for a simultaneous-billing location (R-014)."""
+    location, simultaneous_locations = _resolve_simultaneous_location(request)
+
+    today = timezone.localdate()
+    this_ym = (today.year, today.month)
+    next_ym = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
+    period_options = [
+        {
+            "key": f"{y:04d}-{m:02d}",
+            "year": y,
+            "month": m,
+            "label": f"{month_name(m)} {y}",
+            "caption": "Bulan ini" if idx == 0 else "Bulan depan",
+        }
+        for idx, (y, m) in enumerate((this_ym, next_ym))
+    ]
+    allowed_periods = {opt["key"]: opt for opt in period_options}
+
     if request.method == "POST":
-        # 1. Tentukan Periode (Logika: Bulan Depan dari Hari Ini)
-        # Kenapa bulan depan? Karena biasanya admin menyiapkan tagihan sebelum bulan berjalan.
-        today = timezone.now().date()
-        next_month = today + relativedelta(months=1)
-        billing_start_base = next_month.replace(day=1)  # Tgl 1 Bulan Depan
-
-        # 2. Ambil semua kontrak aktif
-        active_contracts = TenantContract.objects.filter(is_active=True)
-
-        # A-DATA-04 fix: Filter berdasarkan lokasi admin
-        active_contracts = scoped(active_contracts, request.user, "room__kost_location")
-
-        created_count = 0
-        skipped_count = 0
-
-        for contract in active_contracts:
-            location_name = (contract.room.kost_location.name or "").strip().lower()
-            is_ancol = "ancol" in location_name
-
-            if is_ancol:
-                # ANCOL: siklus per-tenant berdasarkan tanggal mulai kontrak
-                # Contoh: mulai tgl 10, maka jatuh tempo tetap tgl 10 setiap bulan
-                try:
-                    billing_start = billing_start_base.replace(day=contract.start_date.day)
-                except ValueError:
-                    # Fallback untuk tanggal 29/30/31 di bulan pendek
-                    billing_start = billing_start_base.replace(day=28)
-                # W5/BQ-1: jatuh tempo = tanggal tagihan + 10 hari
-                due_date = billing_start + relativedelta(days=10)
-            else:
-                # NON-ANCOL: serentak mengikuti tanggal global sistem (start bulan)
-                billing_start = billing_start_base
-                # Ketentuan existing: jatuh tempo H+10 dari tanggal muncul tagihan
-                due_date = billing_start + relativedelta(days=10)
-
-            # W4/BQ-6: cek periode ternormalisasi (sumber tunggal dengan constraint unik)
-            exists = Invoice.objects.filter(
-                contract=contract,
-                billing_period_year=billing_start.year,
-                billing_period_month=billing_start.month,
-            ).exists()
-
-            if not exists:
-                try:
-                    Invoice.objects.create(
-                        contract=contract,
-                        billing_period_start=billing_start,
-                        due_date=due_date,
-                        base_rent_amount=contract.monthly_rent_amount,
-                        electricity_bill_amount=0,
-                        total_amount=contract.monthly_rent_amount,
-                        status="BELUM_LUNAS",
-                    )
-                    created_count += 1
-                except IntegrityError:
-                    # Race: invoice periode ini dibuat proses lain bersamaan
-                    skipped_count += 1
-            else:
-                skipped_count += 1
-
-        if created_count > 0:
-            messages.success(
-                request,
-                f"Berhasil membuat {created_count} tagihan baru untuk periode {month_name(billing_start_base.month)} {billing_start_base.year}.",
-            )
+        selected_key = request.POST.get("period", "")
+        selected = allowed_periods.get(selected_key)
+        if selected is None:
+            return HttpResponseBadRequest("Periode tidak valid.")
+        year = cast(int, selected["year"])
+        month = cast(int, selected["month"])
+        created = billing.issue(location, year, month, by=request.user)
+        message = f"{len(created)} tagihan diterbitkan untuk periode {selected['label']}."
+        if created:
+            messages.success(request, message)
         else:
-            messages.info(
-                request, f"Tidak ada tagihan baru. {skipped_count} tagihan sudah tersedia."
-            )
+            messages.info(request, message)
+        return redirect("invoice_list")
 
-    return redirect("invoice_list")
+    selected_key = request.GET.get("period", "")
+    if selected_key not in allowed_periods:
+        selected_key = period_options[0]["key"]
+    selected = allowed_periods[selected_key]
+    year = cast(int, selected["year"])
+    month = cast(int, selected["month"])
+
+    plan = billing.preview(location, year, month)
+    total_rent = sum((c.monthly_rent_amount for c in plan.to_create), Decimal("0"))
+    existing_rows = [
+        {
+            "invoice": inv,
+            "plate_state": _INVOICE_PLATE_STATE.get(inv.status, "unpaid"),
+        }
+        for inv in plan.existing
+    ]
+
+    return render(
+        request,
+        "finance/issue_invoices.html",
+        {
+            "location": location,
+            "simultaneous_locations": simultaneous_locations,
+            "period_options": period_options,
+            "selected_period": selected,
+            "to_create": plan.to_create,
+            "to_create_count": len(plan.to_create),
+            "existing_rows": existing_rows,
+            "existing_count": len(existing_rows),
+            "total_rent": total_rent,
+        },
+    )

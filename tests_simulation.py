@@ -30,6 +30,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import KostLocation, Room
+from finance.billing import issue_due
 from finance.models import ElectricityReading, Invoice, OperationCost, Payment
 from tenants.models import MaintenanceTicket, Tenant, TenantContract
 from users.models import AdminProfile
@@ -92,16 +93,22 @@ class FullBusinessProcessTest(TestCase):
             name="Kost Ancol",
             address="Jl. Pasir Putih, Ancol",
             electricity_rate_per_kwh=Decimal("1500.00"),
+            billing_mode=KostLocation.BillingMode.PER_ROOM_CYCLE,
+            bills_electricity=True,
         )
         self.loc_kana = KostLocation.objects.create(
             name="Kost Kana",
             address="Jl. Dago Pakar, Bandung",
             electricity_rate_per_kwh=Decimal("1700.00"),
+            billing_mode=KostLocation.BillingMode.SIMULTANEOUS,
+            bills_electricity=False,
         )
         self.loc_uns = KostLocation.objects.create(
             name="Kost UNS",
             address="Jl. Ir Sutami, Solo",
             electricity_rate_per_kwh=Decimal("1300.00"),
+            billing_mode=KostLocation.BillingMode.SIMULTANEOUS,
+            bills_electricity=False,
         )
 
         # 0.3 — Create Rooms (3 per location for testing)
@@ -592,20 +599,44 @@ class FullBusinessProcessTest(TestCase):
         return tenant, contract
 
     def test_phase6_01_generate_invoices_bulk(self):
-        """F-28: Generate bulk invoices creates new invoices."""
-        tenant, contract = self._setup_billing_data()
-        resp = self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
+        """F-28 / R-014: Simultaneous issue_invoices creates invoices with preview."""
+        tenant = Tenant.objects.create(
+            full_name="UNS Billing Tenant", phone_number="081", emergency_contact_phone="082"
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant,
+            room=self.rooms["U-101"],
+            start_date=date.today() - timedelta(days=15),
+            monthly_rent_amount=Decimal("1000000"),
+        )
+        today = timezone.localdate()
+        period_key = f"{today.year:04d}-{today.month:02d}"
+        preview_resp = self.admin_uns_client.get(reverse("issue_invoices"))
+        self.assertEqual(preview_resp.status_code, 200)
+        self.assertContains(preview_resp, "1 tagihan akan dibuat")
+
+        resp = self.admin_uns_client.post(reverse("issue_invoices"), {"period": period_key})
         self.assertEqual(resp.status_code, 302)
-        # Should have created at least 1 invoice
         self.assertTrue(Invoice.objects.filter(contract=contract).exists())
 
     def test_phase6_02_generate_invoices_idempotent(self):
-        """F-28: Generate twice doesn't create duplicates."""
-        tenant, contract = self._setup_billing_data()
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
+        """F-28 / R-014: Issuing twice for the same month creates no duplicates."""
+        tenant = Tenant.objects.create(
+            full_name="UNS Idempotent Tenant", phone_number="081", emergency_contact_phone="082"
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant,
+            room=self.rooms["U-101"],
+            start_date=date.today() - timedelta(days=15),
+            monthly_rent_amount=Decimal("1000000"),
+        )
+        today = timezone.localdate()
+        period_key = f"{today.year:04d}-{today.month:02d}"
+        self.admin_uns_client.post(reverse("issue_invoices"), {"period": period_key})
         count_first = Invoice.objects.filter(contract=contract).count()
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
+        self.admin_uns_client.post(reverse("issue_invoices"), {"period": period_key})
         count_second = Invoice.objects.filter(contract=contract).count()
+        self.assertEqual(count_first, 1)
         self.assertEqual(count_first, count_second)
 
     def test_phase6_03_invoice_list(self):
@@ -772,23 +803,21 @@ class FullBusinessProcessTest(TestCase):
         self.assertEqual(invoice.status, "TELAT_BAYAR")
 
     def test_phase6_10_management_command_generate_monthly(self):
-        """F-43: generate_monthly_invoices command creates invoices."""
+        """F-43 / R-013: issue_due_invoices command creates due per_room_cycle invoices."""
         tenant, contract = self._setup_billing_data()
-        call_command("generate_monthly_invoices")
-        # Should have created invoice for next month
+        call_command("issue_due_invoices")
         self.assertTrue(Invoice.objects.filter(contract=contract).exists())
 
     def test_phase6_11_ancol_billing_rule(self):
-        """Business Rule B1: Ancol billing uses tenant's start_date.day."""
+        """Business Rule B1: Ancol per_room_cycle uses contract start_date.day + 10 days."""
         tenant, contract = self._setup_billing_data()
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
-        invoice = Invoice.objects.filter(contract=contract).first()
+        call_command("issue_due_invoices")
+        invoice = Invoice.objects.filter(contract=contract).order_by("billing_period_start").first()
         self.assertIsNotNone(invoice)
-        # W5/BQ-1: due date = billing period start + 10 days (Ancol included)
         self.assertEqual(invoice.due_date, invoice.billing_period_start + timedelta(days=10))
 
     def test_phase6_12_non_ancol_billing_rule(self):
-        """Business Rule B1: Non-Ancol billing uses fixed day 1 + 10 days."""
+        """Business Rule B1: Simultaneous location uses day 1 and due day 11."""
         tenant = Tenant.objects.create(
             full_name="UNS Tenant", phone_number="081", emergency_contact_phone="082"
         )
@@ -798,12 +827,13 @@ class FullBusinessProcessTest(TestCase):
             start_date=date.today() - timedelta(days=15),
             monthly_rent_amount=Decimal("1000000"),
         )
-        self.admin_uns_client.post(reverse("invoice_generate_bulk"))
+        today = timezone.localdate()
+        self.admin_uns_client.post(
+            reverse("issue_invoices"), {"period": f"{today.year:04d}-{today.month:02d}"}
+        )
         invoice = Invoice.objects.filter(contract=contract).first()
         self.assertIsNotNone(invoice)
-        # Billing start should be day 1
         self.assertEqual(invoice.billing_period_start.day, 1)
-        # Due date should be billing_start + 10
         expected_due = invoice.billing_period_start + timedelta(days=10)
         self.assertEqual(invoice.due_date, expected_due)
 
@@ -1713,8 +1743,8 @@ class FullBusinessProcessTest(TestCase):
         pin = contract.payment_pin
         self.assertEqual(len(pin), 6)
 
-        # 3. Generate Invoice
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
+        # 3. Issue Invoice (per_room_cycle)
+        call_command("issue_due_invoices")
         invoice = Invoice.objects.filter(contract=contract).first()
         self.assertIsNotNone(invoice)
         self.assertEqual(invoice.status, "BELUM_LUNAS")
@@ -2275,8 +2305,8 @@ class FullBusinessProcessTest(TestCase):
     def test_phase6_17_ancol_command_due_is_start_plus_10(self):
         """W5/BQ-1: management command applies the same Ancol due-date rule."""
         tenant, contract = self._setup_billing_data()
-        call_command("generate_monthly_invoices")
-        invoice = Invoice.objects.filter(contract=contract).first()
+        call_command("issue_due_invoices")
+        invoice = Invoice.objects.filter(contract=contract).order_by("billing_period_start").first()
         self.assertIsNotNone(invoice)
         self.assertEqual(invoice.due_date, invoice.billing_period_start + timedelta(days=10))
 
@@ -2300,9 +2330,13 @@ class FullBusinessProcessTest(TestCase):
             start_date=date(2026, 1, 15),
             monthly_rent_amount=Decimal("1500000"),
         )
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
-        invoice_clamped = Invoice.objects.filter(contract=contract_clamped).first()
-        invoice_plain = Invoice.objects.filter(contract=contract_plain).first()
+        issue_due(date(2026, 2, 22))
+        invoice_clamped = Invoice.objects.filter(
+            contract=contract_clamped, billing_period_month=2
+        ).first()
+        invoice_plain = Invoice.objects.filter(
+            contract=contract_plain, billing_period_month=2
+        ).first()
         self.assertIsNotNone(invoice_clamped)
         self.assertIsNotNone(invoice_plain)
         start = invoice_clamped.billing_period_start
@@ -2338,16 +2372,26 @@ class FullBusinessProcessTest(TestCase):
             )
 
     def test_phase6_20_bulk_generate_exactly_one_per_period(self):
-        """W4/BQ-6: repeated generation yields exactly one invoice per period."""
-        tenant, contract = self._setup_billing_data()
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
-        self.admin_ancol_client.post(reverse("invoice_generate_bulk"))
+        """W4/BQ-6: repeated simultaneous issuing yields exactly one invoice per period."""
+        tenant = Tenant.objects.create(
+            full_name="UNS Repeat Tenant", phone_number="081", emergency_contact_phone="082"
+        )
+        contract = TenantContract.objects.create(
+            tenant=tenant,
+            room=self.rooms["U-101"],
+            start_date=date.today() - timedelta(days=15),
+            monthly_rent_amount=Decimal("1000000"),
+        )
+        today = timezone.localdate()
+        period_key = f"{today.year:04d}-{today.month:02d}"
+        self.admin_uns_client.post(reverse("issue_invoices"), {"period": period_key})
+        self.admin_uns_client.post(reverse("issue_invoices"), {"period": period_key})
         self.assertEqual(Invoice.objects.filter(contract=contract).count(), 1)
 
     def test_phase6_21_audit_duplicate_invoices_clean(self):
         """W4: audit command reports a clean dataset (constraint prevents dupes)."""
         tenant, contract = self._setup_billing_data()
-        call_command("generate_monthly_invoices")
+        call_command("issue_due_invoices")
         out = io.StringIO()
         call_command("audit_duplicate_invoices", stdout=out)
         self.assertIn("no duplicates found", out.getvalue())

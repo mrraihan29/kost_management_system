@@ -11,12 +11,11 @@
         <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Daftar Tagihan</h2>
         <p class="text-muted small mb-0">Riwayat pembayaran dan status tagihan</p>
     </div>
-    <form action="{% url 'invoice_generate_bulk' %}" method="post" style="display: inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-ink shadow-sm" onclick="return confirm('Apakah Anda yakin ingin membuat tagihan otomatis untuk BULAN DEPAN bagi semua penghuni aktif? Tagihan yang sudah ada tidak akan diduplikasi.')">
-            <i class="fas fa-magic me-2"></i>Generate Tagihan
-        </button>
-    </form>
+    {% if can_issue_simultaneous %}
+    <a href="{% url 'issue_invoices' %}" class="btn btn-ink shadow-sm">
+        <i class="fas fa-magic me-2"></i>Terbitkan tagihan
+    </a>
+    {% endif %}
 </div>
 
 <!-- KARTU FILTER & TABEL -->
