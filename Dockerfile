@@ -1,40 +1,49 @@
-# 1. Gunakan Python 3.11 versi ringan (Slim)
-FROM python:3.11-slim
+# 1. Python ringan (slim).
+FROM python:3.14-slim
 
-# 2. Set environment variables agar Python tidak membuat file .pyc
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# 2. uv dari image resminya, versi dipatok
+COPY --from=ghcr.io/astral-sh/uv:0.7.7 /uv /uvx /bin/
 
-# 3. Buat folder kerja di dalam container
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+
 WORKDIR /app
 
-# 4. Install dependencies sistem (untuk Postgres) + curl buat healthcheck
+# 3. Dependensi sistem (Postgres) + curl untuk healthcheck
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
     curl \
  && rm -rf /var/lib/apt/lists/*
 
-# 5. Copy requirements dan install
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. Dependensi Python dari uv.lock (tanpa grup dev), di-cache terpisah dari kode
+COPY pyproject.toml uv.lock .python-version /app/
+RUN uv sync --frozen --no-dev
 
-# 6. Copy seluruh kode proyek ke dalam container
+# 5. Kode proyek (.dockerignore menyaring .env, database lokal, media, .venv)
 COPY . /app/
 
-# 7. Kumpulkan file static (CSS/JS) ke satu folder
-RUN python manage.py collectstatic --noinput
+# 6. Kompilasi Tailwind CSS v4 (versi + SHA dipatok) dan kumpulkan file static
+RUN sh scripts/tailwind.sh && rm -rf /app/.bin
+RUN python manage.py collectstatic --noinput --ignore input.css
 
-# 8. Buat direktori logs (SEC-12: audit logging)
+# 7. Direktori logs (SEC-12: audit logging; pindah ke stdout di EKM-35)
 RUN mkdir -p /app/logs
 
-# 9. Healthcheck bawaan Docker (Coolify otomatis baca)
+# 8. Healthcheck bawaan Docker (Coolify otomatis baca)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8000/health/ || exit 1
 
-# 10. SEC-16: Migration sebagai entrypoint terpisah (cegah race condition multi-replica)
-#     Gunakan entrypoint script untuk migrate SEKALI, lalu start Gunicorn
+# 9. SEC-16: migrasi sekali di entrypoint, lalu Gunicorn (non-root user)
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh \
+ && useradd --create-home --shell /bin/sh appuser \
+ && mkdir -p /app/media \
+ && chown -R appuser:appuser /app/logs /app/staticfiles /app/media
+USER appuser
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

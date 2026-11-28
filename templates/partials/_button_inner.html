@@ -1,0 +1,22 @@
+{% with base="inline-flex min-h-12 items-center justify-center gap-2 rounded-control px-6 font-bold transition-colors" %}
+  {% if href and not disabled and not loading %}
+    <a href="{{ href }}" class="{{ base }} {{ tone }} {{ extra_class|default:'' }}">
+      {% if icon %}<svg class="h-5 w-5 shrink-0" aria-hidden="true"><use href="#{{ icon }}"/></svg>{% endif %}
+      <span>{{ label }}</span>
+    </a>
+  {% else %}
+    <button
+      type="{{ type|default:'button' }}"
+      {% if disabled or loading %}disabled aria-disabled="true"{% endif %}
+      class="{{ base }} {{ tone }} {% if disabled or loading %}opacity-40 cursor-not-allowed{% else %}cursor-pointer{% endif %} {{ extra_class|default:'' }}"
+    >
+      {% if loading %}
+        <svg class="h-5 w-5 shrink-0 motion-safe:animate-spin" aria-hidden="true"><use href="#i-spinner"/></svg>
+        <span>{{ loading_label|default:"Menyimpan…" }}</span>
+      {% else %}
+        {% if icon %}<svg class="h-5 w-5 shrink-0" aria-hidden="true"><use href="#{{ icon }}"/></svg>{% endif %}
+        <span>{{ label }}</span>
+      {% endif %}
+    </button>
+  {% endif %}
+{% endwith %}

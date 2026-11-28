@@ -8,3 +8,6 @@ db.sqlite3
 media/
 logs/
 staticfiles/
+.pytest_cache/
+.ruff_cache/
+.bin/

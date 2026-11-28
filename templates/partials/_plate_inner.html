@@ -1,0 +1,25 @@
+{% if size == "lg" %}
+  {% with size_cls="w-[84px] text-[38px] lg:w-[104px] lg:text-[46px]" mark_cls="mark" %}
+    {% if href %}
+      <a href="{{ href }}" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</a>
+    {% else %}
+      <div role="img" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</div>
+    {% endif %}
+  {% endwith %}
+{% elif size == "sm" %}
+  {% with size_cls="w-9 text-xs" mark_cls="mark" %}
+    {% if href %}
+      <a href="{{ href }}" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</a>
+    {% else %}
+      <div role="img" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</div>
+    {% endif %}
+  {% endwith %}
+{% else %}
+  {% with size_cls="w-11 text-lg" mark_cls="mark" %}
+    {% if href %}
+      <a href="{{ href }}" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</a>
+    {% else %}
+      <div role="img" class="plate {{ glaze }} {{ size_cls }} {{ extra_class|default:'' }}" aria-label="{{ label_override|default:'Kamar ' }}{% if not label_override %}{{ number }}, {{ state_text }}{% endif %}">{{ number }}{% if mark %}<svg class="{{ mark_cls }}" aria-hidden="true"><use href="#{{ mark }}"/></svg>{% endif %}</div>
+    {% endif %}
+  {% endwith %}
+{% endif %}

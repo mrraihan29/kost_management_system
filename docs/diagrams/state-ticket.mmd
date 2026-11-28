@@ -1,0 +1,8 @@
+stateDiagram-v2
+  [*] --> PENDING: Tenant reports damage
+  PENDING --> PROSES: Staff starts repair
+  PENDING --> DITOLAK: Staff declines
+  PROSES --> SELESAI: repair done, completion date set
+  PROSES --> PENDING: put back in queue
+  SELESAI --> [*]
+  DITOLAK --> [*]

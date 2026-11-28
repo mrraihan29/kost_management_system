@@ -1,0 +1,29 @@
+{% comment %}
+Room / period enamel plate (DESIGN.md).
+Params: number, state (paid|wait|late|meter|unpaid|empty), size (sm|md|lg), href (optional), label_override (optional).
+{% endcomment %}
+{% if state == "paid" %}
+  {% with glaze="g-paid" mark="m-paid" state_text="lunas" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% elif state == "wait" %}
+  {% with glaze="g-wait" mark="m-wait" state_text="menunggu verifikasi" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% elif state == "late" %}
+  {% with glaze="g-late" mark="m-late" state_text="telat" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% elif state == "meter" %}
+  {% with glaze="g-meter" mark="m-meter" state_text="meteran belum diisi" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% elif state == "empty" %}
+  {% with glaze="g-empty" mark="" state_text="kosong" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% else %}
+  {% with glaze="g-unpaid" mark="" state_text="tagihan belum dibayar" %}
+    {% include "partials/_plate_inner.html" %}
+  {% endwith %}
+{% endif %}

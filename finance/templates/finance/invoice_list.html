@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
 {% load finance_extras %}
 
 {% block title %}Daftar Tagihan{% endblock %}
@@ -12,12 +11,11 @@
         <h2 class="brand-font mb-1" style="color: var(--color-text-main);">Daftar Tagihan</h2>
         <p class="text-muted small mb-0">Riwayat pembayaran dan status tagihan</p>
     </div>
-    <form action="{% url 'invoice_generate_bulk' %}" method="post" style="display: inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-ink shadow-sm" onclick="return confirm('Apakah Anda yakin ingin membuat tagihan otomatis untuk BULAN DEPAN bagi semua penghuni aktif? Tagihan yang sudah ada tidak akan diduplikasi.')">
-            <i class="fas fa-magic me-2"></i>Generate Tagihan
-        </button>
-    </form>
+    {% if can_issue_simultaneous %}
+    <a href="{% url 'issue_invoices' %}" class="btn btn-ink shadow-sm">
+        <i class="fas fa-magic me-2"></i>Terbitkan tagihan
+    </a>
+    {% endif %}
 </div>
 
 <!-- KARTU FILTER & TABEL -->
@@ -59,7 +57,7 @@
 
     <!-- Tabel Data -->
     <div class="table-responsive">
-        <table class="table align-middle mb-0 table-hover">
+        <table class="table align-middle mb-0 table-hover table-stack">
             <thead style="background-color: var(--color-primary-light);">
                 <tr>
                     <th class="ps-4 py-3 text-uppercase small fw-bold" style="color: var(--color-primary);">ID</th>
@@ -74,28 +72,28 @@
             <tbody>
                 {% for inv in invoices %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4 text-muted small fw-bold">#{{ inv.id }}</td>
-                    <td>
+                    <td class="ps-4 text-muted small fw-bold" data-label="ID">#{{ inv.id }}</td>
+                    <td data-label="Penghuni">
                         <div class="fw-bold text-dark">{{ inv.contract.tenant.full_name }}</div>
                         <span class="badge bg-light text-dark border border-secondary mt-1" style="font-weight: normal;">
                             {{ inv.contract.room.room_number }}
                         </span>
                     </td>
-                    <td class="text-muted small">
-                        {{ inv.billing_period_start|date:"M Y" }}
+                    <td class="text-muted small" data-label="Periode">
+                        {{ inv.billing_period_start|date:"F Y" }}
                     </td>
-                    <td class="small">
+                    <td class="small" data-label="Jatuh Tempo">
                         <div class="d-flex flex-column">
-                            <span>{{ inv.due_date|date:"d M Y" }}</span>
+                            <span>{{ inv.due_date|date:"j F Y" }}</span>
                             {% if inv.status == 'TELAT_BAYAR' %}
                                 <span class="text-danger fw-bold" style="font-size: 0.7rem;">LEWAT JATUH TEMPO</span>
                             {% endif %}
                         </div>
                     </td>
-                    <td class="fw-bold" style="color: var(--color-text-main);">
-                        Rp {{ inv.total_amount|intcomma }}
+                    <td class="fw-bold" data-label="Total" style="color: var(--color-text-main);">
+                        {{ inv.total_amount|rupiah }}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         {% if inv.status == 'LUNAS' %}
                             <span class="badge-pill badge-success"><i class="fas fa-check me-1"></i> Lunas</span>
                         {% elif inv.status == 'TELAT_BAYAR' %}
@@ -106,11 +104,11 @@
                             <span class="badge bg-secondary text-white" style="border-radius: 20px; padding: 5px 10px; font-size: 0.75rem;">Belum Lunas</span>
                         {% endif %}
                     </td>
-                    <td class="pe-4 text-end">
+                    <td class="pe-4 text-end cell-actions">
                         
                         <!-- TOMBOL WA (Hanya jika Belum Lunas / Telat) -->
                         {% if inv.status == 'BELUM_LUNAS' or inv.status == 'TELAT_BAYAR' %}
-                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|format_wa }}?text=Halo%20{{ inv.contract.tenant.full_name|urlencode }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number|urlencode }}%20bulan%20ini%20sebesar%20Rp%20{{ inv.total_amount|intcomma }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
+                            <a href="https://wa.me/{{ inv.contract.tenant.phone_number|format_wa }}?text=Halo%20{{ inv.contract.tenant.full_name|urlencode }},%20tagihan%20kost%20kamar%20{{ inv.contract.room.room_number|urlencode }}%20bulan%20ini%20sebesar%20{{ inv.total_amount|rupiah|urlencode }}%20sudah%20terbit.%20Mohon%20segera%20dilunasi.%20Terima%20kasih." 
                                 target="_blank" 
                                 class="btn btn-sm btn-outline-success me-1" 
                                 title="Kirim Tagihan via WA">
@@ -139,7 +137,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="7" class="text-center py-5 text-muted table-stack-empty">
                         <div class="mb-3"><i class="fas fa-folder-open fa-3x opacity-25"></i></div>
                         <p class="mb-0">Data tagihan tidak ditemukan.</p>
                         {% if search_query or current_status %}

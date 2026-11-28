@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Panduan Komponen Plat Nomor{% endblock %}
+{% block legacy_styles %}{% endblock %}
+{% block legacy_scripts %}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+  <header>
+    <h1 class="text-2xl font-bold leading-tight text-ink">Panduan Komponen · Plat Nomor</h1>
+    <p class="mt-2 text-base text-ink-soft">
+      Seluruh token warna, tipografi sistem, angka tabular, focus ring, dan komponen dasar antarmuka EKM.
+    </p>
+  </header>
+
+  <section class="mt-8" aria-labelledby="sg-plates">
+    <h2 id="sg-plates" class="mb-2 text-base font-bold text-ink">Plat Nomor Kamar (6 Glasir)</h2>
+    <div class="rounded-surface bg-white p-6 shadow-surface">
+      <div class="flex flex-wrap items-center gap-4">
+        {% include "partials/plate.html" with number="03" state="paid" size="md" %}
+        {% include "partials/plate.html" with number="12" state="wait" size="md" %}
+        {% include "partials/plate.html" with number="21" state="late" size="md" %}
+        {% include "partials/plate.html" with number="07" state="meter" size="md" %}
+        {% include "partials/plate.html" with number="67" state="unpaid" size="md" %}
+        {% include "partials/plate.html" with number="05" state="empty" size="md" %}
+      </div>
+      <div class="mt-6 flex flex-wrap items-end gap-4 border-t border-rule pt-6">
+        {% include "partials/plate.html" with number="12" state="wait" size="lg" %}
+        {% include "partials/plate.html" with number="14" state="paid" size="md" href="#sg-plates" %}
+        {% include "partials/plate.html" with number="OKT" state="late" size="sm" label_override="Tagihan Oktober 2026, telat" %}
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-8" aria-labelledby="sg-buttons">
+    <h2 id="sg-buttons" class="mb-2 text-base font-bold text-ink">Tombol Utama &amp; Sekunder</h2>
+    <div class="rounded-surface bg-white p-6 shadow-surface">
+      <div class="flex flex-wrap items-center gap-3">
+        {% include "partials/button.html" with label="Setujui pembayaran" variant="primary" %}
+        {% include "partials/button.html" with label="Simpan" variant="primary" disabled=True %}
+        {% include "partials/button.html" with label="Simpan" variant="primary" loading=True %}
+      </div>
+      <div class="mt-4 flex flex-wrap items-center gap-3">
+        {% include "partials/button.html" with label="Lihat riwayat" variant="secondary" href="#sg-buttons" %}
+        {% include "partials/button.html" with label="Tolak" variant="secondary" disabled=True %}
+        {% include "partials/button.html" with label="Tolak" variant="secondary" loading=True loading_label="Memproses…" %}
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-8" aria-labelledby="sg-upload">
+    <h2 id="sg-upload" class="mb-2 text-base font-bold text-ink">Target Unggah Berkas</h2>
+    <div class="grid gap-4 rounded-surface bg-white p-6 shadow-surface sm:grid-cols-2">
+      {% include "partials/upload_target.html" with id="up-default" name="proof_default" label="Unggah bukti transfer" variant="primary" hint="JPG atau PNG, maksimal 5 MB." %}
+      {% include "partials/upload_target.html" with id="up-secondary" name="proof_secondary" label="Unggah foto KTP" variant="secondary" disabled=True %}
+      {% include "partials/upload_target.html" with id="up-loading" name="proof_loading" label="Unggah bukti" variant="primary" loading=True file_name="transfer-nov.jpg" %}
+      {% include "partials/upload_target.html" with id="up-error" name="proof_error" label="Unggah ulang bukti" variant="primary" error="Berkas lebih dari 5 MB. Kompres gambar JPG atau PNG lalu unggah lagi." %}
+    </div>
+  </section>
+
+  <section class="mt-8" aria-labelledby="sg-fields">
+    <h2 id="sg-fields" class="mb-2 text-base font-bold text-ink">Kolom Isian Teks</h2>
+    <div class="grid gap-4 rounded-surface bg-white p-6 shadow-surface sm:grid-cols-2">
+      {% include "partials/text_field.html" with id="tf-default" name="room_number" label="Nomor kamar" placeholder="Contoh: A-12" hint="Sesuai label di pintu kamar." %}
+      {% include "partials/text_field.html" with id="tf-disabled" name="location" label="Lokasi kost" value="Kost Ancol" disabled=True %}
+      {% include "partials/text_field.html" with id="tf-error" name="meter_end" label="Angka meteran akhir" type="number" value="1040" error="Angka meteran akhir harus lebih besar dari angka awal (1.120 kWh)." %}
+    </div>
+  </section>
+
+  <section class="mt-8" aria-labelledby="sg-messages">
+    <h2 id="sg-messages" class="mb-2 text-base font-bold text-ink">Pesan Sistem &amp; Status Kosong</h2>
+    <div class="space-y-3">
+      {% include "partials/message.html" with tags="success" text="Pembayaran kamar 12 disetujui." %}
+      {% include "partials/message.html" with tags="info" text="Tagihan Kost Ancol terbit otomatis 7 hari sebelum tanggal siklus." %}
+      {% include "partials/message.html" with tags="error" text="Nominal transfer Rp 1.770.000, kurang Rp 50.000. Unggah bukti kekurangan." %}
+    </div>
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      {% include "partials/empty_state.html" with heading="Tidak ada yang perlu dikerjakan." body="Semua kamar beres." %}
+      {% include "partials/empty_state.html" with heading="Tidak ada tagihan." body="Terima kasih sudah membayar tepat waktu." action_label="Lihat riwayat" action_href="#sg-messages" %}
+    </div>
+  </section>
+
+  <section class="mt-8" aria-labelledby="sg-tokens">
+    <h2 id="sg-tokens" class="mb-2 text-base font-bold text-ink">Angka Tabular &amp; Tipografi</h2>
+    <div class="rounded-surface bg-white p-6 shadow-surface">
+      <dl class="grid grid-cols-[1fr_auto] gap-y-2 text-sm tabular-nums">
+        <dt class="text-ink-soft">Sewa 10 Okt sampai 9 Nov</dt><dd class="font-semibold">Rp 1.600.000</dd>
+        <dt class="text-ink-soft">Listrik 125 kWh × Rp 2.000</dt><dd class="font-semibold">Rp 250.000</dd>
+        <dt class="font-bold text-ink">Total tagihan</dt><dd class="text-base font-extrabold text-ink">Rp 1.850.000</dd>
+      </dl>
+    </div>
+  </section>
+</div>
+{% endblock %}

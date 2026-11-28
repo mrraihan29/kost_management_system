@@ -1,0 +1,14 @@
+stateDiagram-v2
+  [*] --> BELUM_LUNAS: issued
+  BELUM_LUNAS --> TELAT_BAYAR: daily job, past due date
+  BELUM_LUNAS --> MENUNGGU_VERIFIKASI: Tenant uploads proof
+  TELAT_BAYAR --> MENUNGGU_VERIFIKASI: Tenant uploads proof
+  MENUNGGU_VERIFIKASI --> LUNAS: Staff approves
+  MENUNGGU_VERIFIKASI --> BELUM_LUNAS: Staff rejects, not yet due
+  MENUNGGU_VERIFIKASI --> TELAT_BAYAR: Staff rejects, past due
+  LUNAS --> [*]
+  note right of BELUM_LUNAS
+    Metered room at an electricity-billing location:
+    hidden from the Tenant until a meter reading exists.
+    Amounts are frozen from MENUNGGU_VERIFIKASI on.
+  end note

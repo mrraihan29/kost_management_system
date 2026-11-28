@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load humanize %}
 {% load finance_extras %}
 
 {% block title %}Dashboard Admin{% endblock %}
@@ -17,7 +16,7 @@
         {% if request.user.is_superuser %}
         <form method="get" class="d-flex align-items-center bg-white p-1 rounded shadow-sm border">
             <i class="fas fa-filter text-muted ms-2 me-2"></i>
-            <select name="location" class="form-select border-0 shadow-none py-1 pe-4" style="min-width: 150px; font-size: 0.9rem;" onchange="this.form.submit()">
+            <select name="location" class="form-select border-0 shadow-none py-1 pe-4" style="min-width: 150px;" onchange="this.form.submit()">
                 <option value="">-- Semua Lokasi --</option>
                 {% for loc in all_locations %}
                     <option value="{{ loc.id }}" {% if selected_location_id == loc.id %}selected{% endif %}>
@@ -43,7 +42,7 @@
     
     <!-- Card 1: Menunggu (Prioritas Tinggi) -->
     <div class="col-md-4">
-        <div class="card-paper h-100 position-relative">
+        <div class="card-paper h-100">
             <div class="card-body-clean">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -58,14 +57,12 @@
                     Bukti bayar baru yang perlu diperiksa.
                 </div>
             </div>
-            <!-- Garis indikator bawah -->
-            <div style="height: 4px; width: 100%; background-color: var(--color-warning); position: absolute; bottom: 0;"></div>
         </div>
     </div>
 
     <!-- Card 2: Telat Bayar -->
     <div class="col-md-4">
-        <div class="card-paper h-100 position-relative">
+        <div class="card-paper h-100">
             <div class="card-body-clean">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -80,28 +77,26 @@
                     Penghuni melewati jatuh tempo.
                 </div>
             </div>
-            <div style="height: 4px; width: 100%; background-color: var(--color-danger); position: absolute; bottom: 0;"></div>
         </div>
     </div>
 
     <!-- Card 3: Pemasukan -->
     <div class="col-md-4">
-        <div class="card-paper h-100 position-relative">
+        <div class="card-paper h-100">
             <div class="card-body-clean">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <p class="text-muted small fw-bold text-uppercase mb-1">Pemasukan Bulan Ini</p>
-                        <h2 class="fw-bold mb-0 mt-2" style="color: var(--color-success);">Rp {{ income_this_month|intcomma }}</h2>
+                        <p class="text-muted small fw-bold text-uppercase mb-1">Pemasukan Bulan Ini (Kas)</p>
+                        <h2 class="fw-bold mb-0 mt-2" style="color: var(--color-success);">{{ income_this_month|rupiah }}</h2>
                     </div>
                     <div class="p-3 rounded-circle" style="background-color: var(--color-success-bg);">
                         <i class="fas fa-wallet fa-2x" style="color: var(--color-success);"></i>
                     </div>
                 </div>
                 <div class="mt-3 small text-muted">
-                    Total pembayaran yang sudah lunas.
+                    Pembayaran yang sudah diverifikasi (arus kas).
                 </div>
             </div>
-            <div style="height: 4px; width: 100%; background-color: var(--color-success); position: absolute; bottom: 0;"></div>
         </div>
     </div>
 </div>
@@ -115,10 +110,7 @@
         <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
             {% for room in room_visual_data %}
             <div class="col">
-                <div class="p-3 rounded-3 text-center position-relative {{ room.color }} shadow-sm h-100" 
-                    style="transition: transform 0.2s;" 
-                    onmouseover="this.style.transform='scale(1.05)'" 
-                    onmouseout="this.style.transform='scale(1)'"
+                <div class="p-3 rounded-3 text-center position-relative {{ room.color }} shadow-sm h-100 room-tile"
                     title="{{ room.tenant }} ({{ room.status }})">
                     
                     <!-- Nomor Kamar -->
@@ -161,7 +153,7 @@
     </div>
     
     <div class="table-responsive">
-        <table class="table align-middle mb-0">
+        <table class="table align-middle mb-0 table-stack">
             <thead style="background-color: #F9FAFB;">
                 <tr>
                     <th class="ps-4 py-3 text-uppercase small text-muted fw-bold" style="font-family: 'Inter'; letter-spacing: 0.5px;">Penghuni</th>
@@ -175,50 +167,54 @@
             <tbody>
                 {% for invoice in attention_list %}
                 <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td class="ps-4 py-3">
+                    <td class="ps-4 py-3" data-label="Penghuni">
                         <div class="fw-bold text-dark">{{ invoice.contract.tenant.full_name }}</div>
                         <div class="small text-muted font-monospace">PIN: {{ invoice.contract.payment_pin }}</div>
                     </td>
-                    <td>
+                    <td data-label="Kamar">
                         <span class="badge bg-light text-dark border">{{ invoice.contract.room.room_number }}</span>
                     </td>
-                    <td>
-                        {{ invoice.due_date|date:"d M Y" }}
+                    <td data-label="Jatuh Tempo">
+                        {{ invoice.due_date|date:"j F Y" }}
                         {% if invoice.status == 'TELAT_BAYAR' %}
                             <br><span class="text-danger small fw-bold" style="font-size: 0.7rem;">LEWAT JATUH TEMPO</span>
                         {% endif %}
                     </td>
-                    <td class="fw-bold" style="color: var(--color-text-main);">Rp {{ invoice.total_amount|intcomma }}</td>
-                    <td>
+                    <td class="fw-bold" data-label="Total" style="color: var(--color-text-main);">{{ invoice.total_amount|rupiah }}</td>
+                    <td data-label="Status">
                         {% if invoice.status == 'MENUNGGU_VERIFIKASI' %}
                             <span class="badge-pill badge-warning">Verifikasi</span>
                         {% else %}
                             <span class="badge-pill badge-danger">Telat Bayar</span>
                         {% endif %}
                     </td>
-                    <td class="text-end pe-4">
+                    <td class="text-end pe-4 cell-actions">
                         {% if invoice.payments.last %}
                             <div class="btn-group">
                                 <a href="{{ invoice.payments.last.payment_proof_file.url }}" target="_blank" class="btn btn-sm btn-ink-outline" title="Lihat Bukti">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 
-                                <!-- Tombol Approve (POST) -->
-                                <form method="post" action="{% url 'verify_payment' invoice.payments.last.id 'approve' %}" style="display:inline;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-success);" onclick="return confirm('Terima pembayaran ini dan tandai LUNAS?')">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                </form>
-                                
-                                <!-- Tombol Reject (POST with rejection note) -->
-                                <form method="post" action="{% url 'verify_payment' invoice.payments.last.id 'reject' %}" style="display:inline;" onsubmit="return confirmReject(this);">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="rejection_note" class="reject-note-input">
-                                    <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-danger);">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </form>
+                                {% if invoice.status == 'MENUNGGU_VERIFIKASI' and invoice.pending_payments %}
+                                    {% with p=invoice.pending_payments.0 %}
+                                    <!-- Tombol Approve (POST) -->
+                                    <form method="post" action="{% url 'verify_payment' p.id 'approve' %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-success);" onclick="return confirm('Terima pembayaran ini dan tandai LUNAS?')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </form>
+
+                                    <!-- Tombol Reject (POST with rejection note) -->
+                                    <form method="post" action="{% url 'verify_payment' p.id 'reject' %}" style="display:inline;" onsubmit="return confirmReject(this);">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="rejection_note" class="reject-note-input">
+                                        <button type="submit" class="btn btn-sm btn-ink" style="background-color: var(--color-danger);">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </form>
+                                    {% endwith %}
+                                {% endif %}
                             </div>
                         {% else %}
                             <button class="btn btn-sm btn-light text-muted border" disabled>Belum Upload</button>
@@ -231,7 +227,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">
+                    <td colspan="6" class="text-center py-5 text-muted table-stack-empty">
                         <div class="mb-3"><i class="fas fa-check-circle fa-3x text-success opacity-25"></i></div>
                         <h6 class="fw-bold">Semua Beres!</h6>
                         <p class="small">Tidak ada tagihan yang perlu perhatian saat ini.</p>

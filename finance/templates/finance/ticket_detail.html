@@ -32,7 +32,7 @@
                         <i class="fas fa-check-circle fs-4 me-3"></i>
                         <div>
                             <div class="small text-uppercase fw-bold opacity-75">Masalah Terselesaikan Pada:</div>
-                            <div class="fw-bold">{{ ticket.completion_date|date:"l, d F Y - H:i" }}</div>
+                            <div class="fw-bold">{{ ticket.completion_date|date:"l, j F Y - H:i" }}</div>
                         </div>
                     </div>
                 {% endif %}
@@ -69,13 +69,14 @@
                 <form method="post">
                     {% csrf_token %}
                     
+                    {% if valid_options %}
                     <div class="mb-3">
                         <label class="form-label-clean">Update Status</label>
                         <select name="status" class="form-select shadow-none p-3" style="border-color: var(--color-primary);">
-                            <option value="PENDING" {% if ticket.status == 'PENDING' %}selected{% endif %}>Menunggu Respon</option>
-                            <option value="PROSES" {% if ticket.status == 'PROSES' %}selected{% endif %}>Sedang Diperbaiki (Teknisi OTW)</option>
-                            <option value="SELESAI" {% if ticket.status == 'SELESAI' %}selected{% endif %}>Selesai / Beres</option>
-                            <option value="DITOLAK" {% if ticket.status == 'DITOLAK' %}selected{% endif %}>Tolak Laporan</option>
+                            <option value="" selected>-- Pilih Status Baru --</option>
+                            {% for value, label in valid_options %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
                         </select>
                     </div>
 
@@ -88,6 +89,11 @@
                             <i class="fas fa-check-circle me-2"></i> Simpan Perubahan
                         </button>
                     </div>
+                    {% else %}
+                    <div class="alert alert-secondary text-center">
+                        <i class="fas fa-lock me-1"></i> Status <strong>{{ ticket.get_status_display }}</strong> adalah status final dan tidak dapat diubah lagi.
+                    </div>
+                    {% endif %}
                 </form>
 
             </div>

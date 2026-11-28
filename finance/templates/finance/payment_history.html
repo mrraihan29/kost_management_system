@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Riwayat Pembayaran{% endblock %}
 
@@ -39,10 +39,10 @@
                                     {{ inv.billing_period_start|date:"F Y" }}
                                 </td>
                                 <td>
-                                    Rp {{ inv.total_amount|intcomma }}
+                                    {{ inv.total_amount|rupiah }}
                                 </td>
                                 <td class="small text-muted">
-                                    {{ inv.due_date|date:"d M Y" }}
+                                    {{ inv.due_date|date:"j F Y" }}
                                 </td>
                                 <td class="pe-4 text-end">
                                     {% if inv.status == 'LUNAS' %}

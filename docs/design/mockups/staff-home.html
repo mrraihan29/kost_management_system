@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beranda Staff · EKM</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-enamel: #17409C;
+  --color-enamel-deep: #10307A;
+  --color-porcelain: #F4F6F3;
+  --color-ink: #16212E;
+  --color-ink-soft: #586472;
+  --color-rule: #DDE2DD;
+  --color-paid: #0F7A47;
+  --color-wait: #E9A100;
+  --color-late: #C8281E;
+}
+</style>
+<style>
+  ::selection { background: #17409C; color: #fff; }
+  :focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; border-radius: 6px; }
+  html { scrollbar-color: #7C8794 #F4F6F3; }
+
+  .plate {
+    position: relative; display: grid; place-items: center; flex: none;
+    aspect-ratio: 1; border-radius: 10px; color: #fff; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+    box-shadow: inset 0 0 0 3px var(--glaze), inset 0 0 0 5px rgba(255,255,255,.88);
+    background: var(--glaze);
+  }
+  .plate .mark { position: absolute; top: 9%; right: 9%; width: 26%; height: 26%; }
+  .plate .mark-c { position: absolute; inset: 22%; width: 56%; height: 56%; }
+  .g-paid  { --glaze: #0F7A47; }
+  .g-wait  { --glaze: #E9A100; color: #231A00; box-shadow: inset 0 0 0 3px #E9A100, inset 0 0 0 5px rgba(35,26,0,.5); }
+  .g-late  { --glaze: #C8281E; }
+  .g-meter { --glaze: #17409C; }
+  .g-empty { --glaze: transparent; color: #66717D; box-shadow: none; border: 2px dashed #7C8794; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .plate.just-paid { animation: glaze 900ms cubic-bezier(.16,1,.3,1) both; }
+    @keyframes glaze { from { --glaze: #E9A100; filter: brightness(1.15); } to { filter: none; } }
+  }
+</style>
+</head>
+<body class="bg-porcelain text-ink font-sans antialiased">
+
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <symbol id="m-paid" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="m-wait" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="m-late" viewBox="0 0 16 16"><path d="M8 2.5v7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="8" cy="13" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="m-meter" viewBox="0 0 16 16"><path d="M9.5 1.5L3.5 9h4l-1 5.5 6-7.5h-4z" fill="currentColor"/></symbol>
+</svg>
+
+<div class="lg:grid lg:grid-cols-[17rem_1fr] lg:min-h-screen">
+
+  <!-- Shell: location sign + navigation -->
+  <aside class="lg:bg-enamel lg:text-white lg:flex lg:flex-col lg:p-5 lg:sticky lg:top-0 lg:h-screen">
+    <header class="m-3 rounded-2xl bg-enamel px-5 pt-4 pb-5 text-white shadow-[inset_0_0_0_6px_#17409C,inset_0_0_0_8px_rgba(255,255,255,.85)] lg:m-0 lg:shadow-[inset_0_0_0_6px_#17409C,inset_0_0_0_8px_rgba(255,255,255,.85)]">
+      <p class="text-sm text-white/85">Sabtu, 14 November 2026</p>
+      <h1 class="mt-0.5 text-3xl font-extrabold leading-tight">Kost Ancol</h1>
+    </header>
+
+    <nav aria-label="Menu utama" class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 gap-1 border-t border-rule bg-white px-1.5 pt-2 pb-3.5 lg:static lg:mt-8 lg:flex lg:flex-col lg:gap-1 lg:border-0 lg:bg-transparent lg:p-0">
+      <a href="#" aria-current="page" class="rounded-lg bg-enamel py-2 text-center text-xs font-bold text-white lg:bg-white lg:px-4 lg:py-3 lg:text-left lg:text-base lg:text-enamel">Beranda</a>
+      <a href="#" class="rounded-lg py-2 text-center text-xs text-ink-soft hover:text-ink lg:px-4 lg:py-3 lg:text-left lg:text-base lg:text-white/85 lg:hover:bg-enamel-deep lg:hover:text-white">Tagihan</a>
+      <a href="#" class="rounded-lg py-2 text-center text-xs text-ink-soft hover:text-ink lg:px-4 lg:py-3 lg:text-left lg:text-base lg:text-white/85 lg:hover:bg-enamel-deep lg:hover:text-white"><span class="lg:hidden">Penghuni</span><span class="hidden lg:inline">Penghuni &amp; Kamar</span></a>
+      <a href="#" class="rounded-lg py-2 text-center text-xs text-ink-soft hover:text-ink lg:px-4 lg:py-3 lg:text-left lg:text-base lg:text-white/85 lg:hover:bg-enamel-deep lg:hover:text-white">Pengeluaran</a>
+      <a href="#" class="rounded-lg py-2 text-center text-xs text-ink-soft hover:text-ink lg:px-4 lg:py-3 lg:text-left lg:text-base lg:text-white/85 lg:hover:bg-enamel-deep lg:hover:text-white">Kerusakan</a>
+    </nav>
+
+    <p class="hidden lg:mt-auto lg:block text-sm text-white/80">Masuk sebagai Wahyu, staff Kost Ancol</p>
+  </aside>
+
+  <main class="px-4 pb-28 lg:px-10 lg:pt-8 lg:pb-12">
+    <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-10 xl:gap-14">
+
+      <!-- Left: next task + queue -->
+      <div>
+        <h2 class="sr-only">Tugas berikutnya</h2>
+        <section class="flex items-start gap-4 rounded-2xl bg-white p-4 shadow-[0_1px_0_#DDE2DD,0_8px_24px_-12px_rgba(22,33,46,.18)] lg:p-6">
+          <div class="plate g-wait w-[84px] text-[38px] lg:w-[104px] lg:text-[46px]" aria-label="Kamar 12, menunggu verifikasi">12<svg class="mark"><use href="#m-wait"/></svg></div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xl font-bold leading-snug text-balance lg:text-2xl">Periksa bukti transfer Rina Wulandari</p>
+            <p class="mt-1 tabular-nums">Rp 1.850.000 · dikirim pukul 09.12</p>
+            <a href="#" class="mt-3 flex min-h-12 items-center justify-center rounded-xl bg-enamel px-4 font-bold text-white hover:bg-enamel-deep lg:inline-flex lg:px-8">Periksa bukti</a>
+          </div>
+        </section>
+
+        <section class="mt-8" aria-labelledby="q-title">
+          <div class="mb-2 flex items-baseline justify-between">
+            <h2 id="q-title" class="font-bold">Perlu dikerjakan</h2>
+            <span class="text-sm text-ink-soft">6 lagi</span>
+          </div>
+          <ul class="divide-y divide-rule border-y border-rule">
+            <li><a href="#" class="flex items-center gap-3 py-3 hover:bg-white/70">
+              <div class="plate g-late w-11 text-lg" aria-label="Kamar 21, telat">21<svg class="mark"><use href="#m-late"/></svg></div>
+              <div class="min-w-0"><p class="font-semibold">Agus Setiawan</p><p class="text-sm text-late">Telat 4 hari · kirim pengingat</p></div>
+              <span class="ml-auto text-right text-sm tabular-nums text-ink-soft">Rp 1.600.000</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 py-3 hover:bg-white/70">
+              <div class="plate g-meter w-11 text-lg" aria-label="Kamar 07, meteran belum diisi">07<svg class="mark"><use href="#m-meter"/></svg></div>
+              <div class="min-w-0"><p class="font-semibold">Dimas Prasetyo</p><p class="text-sm text-ink-soft">Meteran belum diisi</p></div>
+              <span class="ml-auto text-right text-sm tabular-nums text-ink-soft">siklus 20 Nov</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 py-3 hover:bg-white/70">
+              <div class="plate g-meter w-11 text-lg" aria-label="Kamar 15, meteran belum diisi">15<svg class="mark"><use href="#m-meter"/></svg></div>
+              <div class="min-w-0"><p class="font-semibold">Yoga Pratama</p><p class="text-sm text-ink-soft">Meteran belum diisi</p></div>
+              <span class="ml-auto text-right text-sm tabular-nums text-ink-soft">siklus 20 Nov</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 py-3 hover:bg-white/70">
+              <div class="plate g-wait w-11 text-lg" aria-label="Kamar 18, menunggu verifikasi">18<svg class="mark"><use href="#m-wait"/></svg></div>
+              <div class="min-w-0"><p class="font-semibold">Putri Maharani</p><p class="text-sm text-ink-soft">Bukti transfer menunggu diperiksa</p></div>
+              <span class="ml-auto text-right text-sm tabular-nums text-ink-soft">Rp 1.700.000</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 py-3 hover:bg-white/70">
+              <div class="plate g-paid w-11 text-lg" aria-label="Kamar 03, lunas">03<svg class="mark"><use href="#m-paid"/></svg></div>
+              <div class="min-w-0"><p class="font-semibold">Sari Lestari</p><p class="text-sm text-ink-soft">Lapor kerusakan: keran kamar mandi bocor</p></div>
+              <span class="ml-auto text-right text-sm text-ink-soft">kemarin</span></a></li>
+          </ul>
+          <a href="#" class="mt-3 inline-block text-sm font-semibold text-enamel underline underline-offset-4">Lihat semua 7 tugas</a>
+        </section>
+      </div>
+
+      <!-- Right: the street of plates -->
+      <section class="mt-10 lg:mt-0" aria-labelledby="s-title">
+        <div class="mb-3 flex items-baseline justify-between">
+          <h2 id="s-title" class="font-bold">Semua kamar</h2>
+          <span id="occupied" class="text-sm tabular-nums text-ink-soft"></span>
+        </div>
+        <ul id="street" class="grid grid-cols-6 gap-2 sm:grid-cols-8 lg:grid-cols-8 xl:grid-cols-10" aria-label="Status semua kamar"></ul>
+        <dl id="legend" class="mt-5 grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-3"></dl>
+        <p class="mt-6 text-sm text-ink-soft">Tagihan Kost Ancol terbit otomatis 7 hari sebelum tanggal siklus tiap kamar. Data pada halaman ini adalah contoh.</p>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Demonstration data for 80 rooms; every room not listed is paid.
+  const exceptions = {
+    w: [12, 18, 32], l: [21, 44], m: [7, 15],
+    o: [67, 69, 70, 72, 73, 75, 76, 77, 79],
+    e: [5, 10, 27, 37, 51, 60, 63, 66, 71, 74, 78, 80],
+  };
+  const states = Array.from({ length: 80 }, () => "p");
+  for (const [k, rooms] of Object.entries(exceptions)) rooms.forEach(r => states[r - 1] = k);
+
+  const kinds = {
+    p: { label: "Lunas", aria: "lunas", cls: "g-paid", mark: "paid" },
+    w: { label: "Menunggu", aria: "menunggu verifikasi", cls: "g-wait", mark: "wait" },
+    l: { label: "Telat", aria: "telat", cls: "g-late", mark: "late" },
+    m: { label: "Meteran", aria: "meteran belum diisi", cls: "g-meter", mark: "meter" },
+    o: { label: "Belum dibayar", aria: "tagihan belum dibayar", cls: "bg-white !text-ink !shadow-[inset_0_0_0_2px_#7C8794]" },
+    e: { label: "Kosong", aria: "kosong", cls: "g-empty" },
+  };
+  const markSvg = (k, cls) => kinds[k].mark ? `<svg class="${cls}" aria-hidden="true"><use href="#m-${kinds[k].mark}"/></svg>` : "";
+
+  document.getElementById("street").innerHTML = states.map((k, i) => {
+    const n = String(i + 1).padStart(2, "0");
+    return `<li><a href="#" class="plate ${kinds[k].cls} w-full text-[15px] sm:text-base" aria-label="Kamar ${n}, ${kinds[k].aria}">${n}${markSvg(k, "mark")}</a></li>`;
+  }).join("");
+
+  const count = k => states.filter(s => s === k).length;
+  document.getElementById("occupied").textContent = `${80 - count("e")} dari 80 terisi`;
+  document.getElementById("legend").innerHTML = Object.keys(kinds).map(k =>
+    `<div class="flex items-center gap-2"><dt class="flex items-center gap-2"><span class="plate ${kinds[k].cls} w-6">${markSvg(k, "mark-c")}</span>${kinds[k].label}</dt><dd class="ml-auto tabular-nums text-ink-soft">${count(k)}</dd></div>`
+  ).join("");
+</script>
+</body>
+</html>

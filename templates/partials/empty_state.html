@@ -1,0 +1,13 @@
+{% comment %}
+Empty state block (DESIGN.md).
+Params: heading, body, action_label (optional), action_href (optional).
+{% endcomment %}
+<div class="rounded-surface bg-white px-6 py-8 shadow-surface">
+  <p class="text-base font-bold text-ink">{{ heading }}</p>
+  <p class="mt-1 text-sm text-ink-soft">{{ body }}</p>
+  {% if action_label and action_href %}
+    <div class="mt-4">
+      {% include "partials/button.html" with label=action_label variant="secondary" href=action_href %}
+    </div>
+  {% endif %}
+</div>

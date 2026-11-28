@@ -1,0 +1,10 @@
+stateDiagram-v2
+  [*] --> PENDING: Tenant uploads proof
+  PENDING --> APPROVED: Staff approves
+  PENDING --> REJECTED: Staff rejects with a reason
+  APPROVED --> [*]
+  REJECTED --> [*]
+  note right of REJECTED
+    Final. A retry is a new Payment;
+    the rejected one stays as history.
+  end note

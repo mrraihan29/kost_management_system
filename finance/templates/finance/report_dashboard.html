@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load humanize %}
+{% load finance_extras %}
 
 {% block title %}Laporan Keuangan{% endblock %}
 
@@ -43,21 +43,21 @@
 <!-- RINGKASAN BIG NUMBERS -->
 <div class="row g-4 mb-4">
     <div class="col-md-4">
-        <div class="card-paper p-4 border-start border-4 border-success h-100">
-            <h6 class="text-muted text-uppercase small fw-bold">Pemasukan (Omzet)</h6>
-            <h2 class="text-success fw-bold mb-0">Rp {{ total_income|intcomma }}</h2>
+        <div class="card-paper p-4 h-100">
+            <h6 class="text-muted text-uppercase small fw-bold">Pemasukan (Periode Tagihan)</h6>
+            <h2 class="text-success fw-bold mb-0">{{ total_income|rupiah }}</h2>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card-paper p-4 border-start border-4 border-danger h-100">
+        <div class="card-paper p-4 h-100">
             <h6 class="text-muted text-uppercase small fw-bold">Pengeluaran (Op)</h6>
-            <h2 class="text-danger fw-bold mb-0">Rp {{ total_expense|intcomma }}</h2>
+            <h2 class="text-danger fw-bold mb-0">{{ total_expense|rupiah }}</h2>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card-paper p-4 border-start border-4 border-primary h-100">
+        <div class="card-paper p-4 h-100">
             <h6 class="text-muted text-uppercase small fw-bold">Profit Bersih</h6>
-            <h2 class="text-primary fw-bold mb-0">Rp {{ net_profit|intcomma }}</h2>
+            <h2 class="text-primary fw-bold mb-0">{{ net_profit|rupiah }}</h2>
         </div>
     </div>
 </div>
@@ -108,6 +108,12 @@
     const pieData = JSON.parse(document.getElementById('pie-data-data').textContent);
     const pieLabels = JSON.parse(document.getElementById('pie-labels-data').textContent);
 
+    function formatRupiah(value) {
+        const rounded = Math.round(Number(value) || 0);
+        const absStr = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return rounded < 0 ? `\u2212Rp ${absStr}` : `Rp ${absStr}`;
+    }
+
     // 1. DATA CHART TREND
     const ctxTrend = document.getElementById('trendChart').getContext('2d');
     new Chart(ctxTrend, {
@@ -131,8 +137,22 @@
         },
         options: {
             responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { y: { beginAtZero: true, grid: { color: '#f3f4f6' } }, x: { grid: { display: false } } }
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.dataset.label}: ${formatRupiah(ctx.parsed.y)}`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f3f4f6' },
+                    ticks: { callback: (value) => formatRupiah(value) }
+                },
+                x: { grid: { display: false } }
+            }
         }
     });
 
@@ -153,7 +173,12 @@
             options: {
                 responsive: true,
                 plugins: { 
-                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } 
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${formatRupiah(ctx.parsed)}`
+                        }
+                    }
                 }
             }
         });

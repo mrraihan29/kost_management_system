@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant J as Daily job 00:05
+  actor S as Staff
+  participant B as Billing service
+  participant D as Database
+  rect rgb(235,240,250)
+  note over J,D: per_room_cycle location (Ancol)
+  J->>B: issue_due(today)
+  B->>D: active contracts whose next cycle date <= today + 7 and has no invoice for that period
+  loop each contract
+    B->>D: insert invoice (unique contract + period), due = cycle date + 10
+  end
+  end
+  rect rgb(240,245,235)
+  note over S,D: simultaneous location
+  S->>B: preview(location, month)
+  B-->>S: "12 tagihan akan dibuat"
+  S->>B: issue(location, month)
+  B->>D: insert one invoice per active contract without one, dated 1st, due 11th
+  B-->>S: "12 tagihan diterbitkan"
+  end
+  note over B,D: Unique constraint (contract, year, month) makes both paths idempotent

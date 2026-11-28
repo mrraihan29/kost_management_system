@@ -1,0 +1,27 @@
+{% comment %}
+Text field (DESIGN.md).
+Params: id, name, label, type, value, placeholder (example only), hint, error, disabled, required, autocomplete, inputmode, raw_identifier.
+{% endcomment %}
+<div>
+  <label for="{{ id }}" class="block text-sm font-semibold text-ink">{{ label }}</label>
+  {% if hint %}
+    <p id="{{ id }}-hint" class="mt-1 text-sm text-ink-soft">{{ hint }}</p>
+  {% endif %}
+  <input
+    id="{{ id }}"
+    name="{{ name }}"
+    type="{{ type|default:'text' }}"
+    {% if inputmode %}inputmode="{{ inputmode }}"{% endif %}
+    {% if raw_identifier %}autocorrect="off" autocapitalize="none" spellcheck="false"{% endif %}
+    {% if value %}value="{{ value }}"{% endif %}
+    {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+    {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+    {% if required %}required{% endif %}
+    {% if disabled %}disabled{% endif %}
+    {% if error %}aria-invalid="true" aria-describedby="{{ id }}-err{% if hint %} {{ id }}-hint{% endif %}"{% elif hint %}aria-describedby="{{ id }}-hint"{% endif %}
+    class="mt-1.5 block min-h-12 w-full rounded-control border-2 px-4 text-base text-ink tabular-nums placeholder:text-ink-soft {% if disabled %}border-outline bg-porcelain opacity-75 cursor-not-allowed{% elif error %}border-late bg-white{% else %}border-outline bg-white hover:border-ink-soft{% endif %}"
+  >
+  {% if error %}
+    <p id="{{ id }}-err" class="mt-1.5 text-sm font-semibold text-late-heading">{{ error }}</p>
+  {% endif %}
+</div>
