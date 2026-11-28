@@ -75,6 +75,10 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
+      - name: Verify Tailwind CSS is up to date
+        run: sh scripts/tailwind.sh && git diff --exit-code static/css/app.css
+      - name: Verify collectstatic manifest build
+        run: uv run python -W error::DeprecationWarning manage.py collectstatic --noinput --ignore input.css
       - run: uv run python -W error::DeprecationWarning manage.py makemigrations --check --dry-run
       - name: Run check --deploy with production settings
         run: |

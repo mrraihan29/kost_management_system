@@ -4,12 +4,15 @@ Rent collection for three kost locations (Owner, Staff, Tenants), live at https:
 
 ## Commands
 - Install: `uv sync`
+- CSS build: `powershell -ExecutionPolicy Bypass -File scripts/tailwind.ps1` (Linux/CI: `sh scripts/tailwind.sh`)
 - Format + lint: `uv run ruff check` and `uv run ruff format --check`
 - Types: `uv run pyright`
 - Unit tests (one file): `uv run pytest <path>`; all: `uv run pytest`
-- E2E: `uv run pytest e2e`
+- E2E: `uv run pytest e2e` (added in EKM-36)
+- UI audit (local Edge + axe): `node scripts/audit_ui.mjs <url> [out_dir]`
 - Ledger check: `uv run scripts/ledger_check.py docs/ledger.yaml --gate design`
 - Django checks: `uv run python manage.py check`; full suite takes about 20 seconds
+- Windows PowerShell 5.1: use `; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }` (not `&&`), and pipe inline Python via `@' ... '@ | uv run python -`
 
 ## Boundaries
 - Always: run the commands above on changed files before finishing; name each e2e test with its `R-xxx`; use the words in `GLOSSARY.md`; build UI with the `frontend-design` and `impeccable` skills to `DESIGN.md`.

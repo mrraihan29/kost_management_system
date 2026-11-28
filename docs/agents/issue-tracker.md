@@ -6,7 +6,6 @@ Issues for this repository live in **Plane** (workspace `naobi`, https://project
 
 - Project: **EKM** ("Evy Kost Management"), id `c476135a-c865-4d70-b11b-0cfe0035b842`
 - Build tickets: `EKM-11` to `EKM-37` (children of `EKM-6`)
-- Labels and modules: `~/.claude/plane-projects.md`
 
 ## States
 

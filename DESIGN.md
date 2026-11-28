@@ -4,9 +4,7 @@ Direction: **Plat Nomor** (ledger D-004 v2, mockups approved at D-012). Every ro
 
 Reference screens: `docs/design/mockups/staff-home.html`, `docs/design/mockups/tenant-invoices.html`.
 
-## Tokens
-
-### Color
+## Colors
 
 Ratios are WCAG 2.2 contrast, measured.
 
@@ -27,7 +25,7 @@ Ratios are WCAG 2.2 contrast, measured.
 
 Focus ring: 3px `wait` outline plus a 7px `ink` halo, so it reads on porcelain, white and enamel alike. Text selection: `enamel` ground, white text.
 
-### Type scale
+## Typography
 
 System font stack only (D-007): `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`. Numerals are tabular wherever amounts, dates or room numbers line up. Rank is carried by weight; three text sizes plus display.
 
@@ -54,7 +52,7 @@ Tailwind's 4px scale. In use: 4, 8, 12, 16, 24, 32, 40. Page gutter 16px on phon
 
 Shadow: one only, `0 1px 0 #DDE2DD, 0 8px 24px -12px rgba(22,33,46,.18)`, on raised white surfaces.
 
-## Component inventory
+## Components
 
 | Component | default | hover | focus | disabled | loading | error | empty |
 |---|---|---|---|---|---|---|---|

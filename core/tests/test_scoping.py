@@ -405,3 +405,18 @@ class TestMediaScoping:
         )
         assert resp.status_code == 200
         resp.close()
+
+
+def test_no_direct_assigned_location_reads_outside_allowlist() -> None:
+    """Guardrail (EKM-15): only core/scoping.py and tenants/forms.py read assigned_location."""
+    repo_root = Path(__file__).resolve().parents[2]
+    allowlist = {"core/scoping.py", "tenants/forms.py"}
+    offenders: list[str] = []
+    for app in ("core", "finance", "tenants"):
+        for py_file in (repo_root / app).rglob("*.py"):
+            rel = py_file.relative_to(repo_root).as_posix()
+            if "/migrations/" in rel or "/tests/" in rel or rel in allowlist:
+                continue
+            if "assigned_location" in py_file.read_text(encoding="utf-8"):
+                offenders.append(rel)
+    assert offenders == [], f"Direct assigned_location reads found: {offenders}"
