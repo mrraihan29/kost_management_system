@@ -1,0 +1,38 @@
+{% comment %}
+Upload target wrapping a hidden file input (DESIGN.md).
+Params: id, name, label, variant (primary|secondary), accept, disabled, loading, file_name, error, hint.
+{% endcomment %}
+<div>
+  {% if variant == "secondary" %}
+    {% with tone="bg-white text-enamel shadow-[inset_0_0_0_2px_#17409C] hover:bg-porcelain" %}
+      <label for="{{ id }}" {% if disabled or loading %}aria-disabled="true"{% endif %} class="flex min-h-12 items-center justify-center gap-2 rounded-control px-5 font-bold transition-colors focus-within:outline-3 focus-within:outline-wait focus-within:outline-offset-2 {{ tone }} {% if disabled or loading %}opacity-40 cursor-not-allowed{% else %}cursor-pointer{% endif %}">
+        {% if loading %}
+          <svg class="h-5 w-5 shrink-0 motion-safe:animate-spin" aria-hidden="true"><use href="#i-spinner"/></svg>
+          <span>{{ file_name|default:"Berkas" }} · Mengunggah…</span>
+        {% else %}
+          <svg class="h-5 w-5 shrink-0" aria-hidden="true"><use href="#i-upload"/></svg>
+          <span>{{ label }}</span>
+        {% endif %}
+        <input id="{{ id }}" name="{{ name }}" type="file" accept="{{ accept|default:'image/jpeg,image/png' }}" {% if disabled or loading %}disabled{% endif %} {% if error %}aria-invalid="true" aria-describedby="{{ id }}-err"{% elif hint %}aria-describedby="{{ id }}-hint"{% endif %} class="sr-only">
+      </label>
+    {% endwith %}
+  {% else %}
+    {% with tone="bg-enamel text-white hover:bg-enamel-deep" %}
+      <label for="{{ id }}" {% if disabled or loading %}aria-disabled="true"{% endif %} class="flex min-h-12 items-center justify-center gap-2 rounded-control px-5 font-bold transition-colors focus-within:outline-3 focus-within:outline-wait focus-within:outline-offset-2 {{ tone }} {% if disabled or loading %}opacity-40 cursor-not-allowed{% else %}cursor-pointer{% endif %}">
+        {% if loading %}
+          <svg class="h-5 w-5 shrink-0 motion-safe:animate-spin" aria-hidden="true"><use href="#i-spinner"/></svg>
+          <span>{{ file_name|default:"Berkas" }} · Mengunggah…</span>
+        {% else %}
+          <svg class="h-5 w-5 shrink-0" aria-hidden="true"><use href="#i-upload"/></svg>
+          <span>{{ label }}</span>
+        {% endif %}
+        <input id="{{ id }}" name="{{ name }}" type="file" accept="{{ accept|default:'image/jpeg,image/png' }}" {% if disabled or loading %}disabled{% endif %} {% if error %}aria-invalid="true" aria-describedby="{{ id }}-err"{% elif hint %}aria-describedby="{{ id }}-hint"{% endif %} class="sr-only">
+      </label>
+    {% endwith %}
+  {% endif %}
+  {% if error %}
+    <p id="{{ id }}-err" class="mt-2 text-sm font-semibold text-late-heading">{{ error }}</p>
+  {% elif hint %}
+    <p id="{{ id }}-hint" class="mt-2 text-sm text-ink-soft">{{ hint }}</p>
+  {% endif %}
+</div>

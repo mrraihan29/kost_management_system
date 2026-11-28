@@ -27,8 +27,9 @@ RUN uv sync --frozen --no-dev
 # 5. Kode proyek (.dockerignore menyaring .env, database lokal, media, .venv)
 COPY . /app/
 
-# 6. Kumpulkan file static
-RUN python manage.py collectstatic --noinput
+# 6. Kompilasi Tailwind CSS v4 (versi + SHA dipatok) dan kumpulkan file static
+RUN sh scripts/tailwind.sh && rm -rf /app/.bin
+RUN python manage.py collectstatic --noinput --ignore input.css
 
 # 7. Direktori logs (SEC-12: audit logging; pindah ke stdout di EKM-35)
 RUN mkdir -p /app/logs

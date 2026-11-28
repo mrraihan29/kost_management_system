@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Prefetch, Sum
 from django.forms import ModelChoiceField
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -352,3 +353,11 @@ def room_delete(request, pk):
     room.delete()
     messages.success(request, f"Kamar '{room_number}' berhasil dihapus.")
     return redirect("room_list")
+
+
+@login_required(login_url="/accounts/login/")
+def styleguide(request):
+    """Owner-only Plat Nomor component styleguide (not linked in navigation)."""
+    if not request.user.is_superuser:
+        raise Http404
+    return render(request, "styleguide.html")

@@ -1,0 +1,17 @@
+{% comment %}
+Django/inline feedback message (DESIGN.md).
+Params: tags, text.
+{% endcomment %}
+{% if "error" in tags or "danger" in tags %}
+  <div role="alert" class="{% if tags %}alert-{{ tags }} {% endif %}rounded-control bg-late-wash px-4 py-3 text-sm font-semibold text-late-heading">
+    {{ text }}
+  </div>
+{% elif "success" in tags %}
+  <div role="status" class="{% if tags %}alert-{{ tags }} {% endif %}rounded-control bg-white px-4 py-3 text-sm font-semibold text-paid shadow-surface">
+    {{ text }}
+  </div>
+{% else %}
+  <div role="status" class="{% if tags %}alert-{{ tags }} {% endif %}rounded-control bg-white px-4 py-3 text-sm font-semibold text-ink shadow-surface">
+    {{ text }}
+  </div>
+{% endif %}

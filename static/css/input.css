@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@source "../../templates/**/*.html";
+@source "../../core/templates/**/*.html";
+@source "../../finance/templates/**/*.html";
+@source "../../tenants/templates/**/*.html";
+@source "../../users/templates/**/*.html";
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-enamel: #17409C;
+  --color-enamel-deep: #10307A;
+  --color-porcelain: #F4F6F3;
+  --color-ink: #16212E;
+  --color-ink-soft: #586472;
+  --color-rule: #DDE2DD;
+  --color-outline: #7C8794;
+  --color-paid: #0F7A47;
+  --color-wait: #E9A100;
+  --color-wait-ink: #231A00;
+  --color-late: #C8281E;
+  --color-late-wash: #FBEAE8;
+  --color-late-heading: #8E1C15;
+  --color-late-body: #5C1A15;
+  --radius-plate: 10px;
+  --radius-control: 12px;
+  --radius-surface: 16px;
+  --shadow-surface: 0 1px 0 #DDE2DD, 0 8px 24px -12px rgba(22, 33, 46, 0.18);
+}
+
+@layer base {
+  html {
+    scrollbar-color: #7C8794 #F4F6F3;
+  }
+
+  ::selection {
+    background: #17409C;
+    color: #FFFFFF;
+  }
+
+  :focus-visible {
+    outline: 3px solid #E9A100;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 7px #16212E;
+    border-radius: 6px;
+  }
+
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 3px solid Highlight;
+      box-shadow: none;
+    }
+
+    [aria-current="page"] {
+      outline: 2px solid Highlight;
+    }
+  }
+}
+
+.sign-plate {
+  box-shadow: inset 0 0 0 6px #17409C, inset 0 0 0 8px rgba(255, 255, 255, 0.85);
+}
+
+.plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  aspect-ratio: 1;
+  border-radius: var(--radius-plate);
+  color: #FFFFFF;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  background: var(--glaze, #17409C);
+  box-shadow: inset 0 0 0 3px var(--glaze, #17409C), inset 0 0 0 5px rgba(255, 255, 255, 0.88);
+}
+
+.plate .mark {
+  position: absolute;
+  top: 9%;
+  right: 9%;
+  width: 26%;
+  height: 26%;
+}
+
+.plate .mark-c {
+  position: absolute;
+  inset: 22%;
+  width: 56%;
+  height: 56%;
+}
+
+.g-paid {
+  --glaze: #0F7A47;
+}
+
+.g-wait {
+  --glaze: #E9A100;
+  color: #231A00;
+  box-shadow: inset 0 0 0 3px #E9A100, inset 0 0 0 5px rgba(35, 26, 0, 0.5);
+}
+
+.g-late {
+  --glaze: #C8281E;
+}
+
+.g-meter {
+  --glaze: #17409C;
+}
+
+.g-unpaid {
+  --glaze: #FFFFFF;
+  color: #16212E;
+  box-shadow: inset 0 0 0 2px #7C8794;
+}
+
+.g-empty {
+  --glaze: transparent;
+  color: #586472;
+  box-shadow: none;
+  border: 2px dashed #7C8794;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .plate.just-paid {
+    animation: ekm-glaze 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes ekm-glaze {
+    from {
+      --glaze: #E9A100;
+      filter: brightness(1.15);
+    }
+    to {
+      filter: none;
+    }
+  }
+}

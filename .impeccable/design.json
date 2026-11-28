@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-28T07:40:00+07:00",
+  "title": "Design System: Evy Kost Management (EKM) — Plat Nomor",
+  "extensions": {
+    "colorMeta": {
+      "enamel": {
+        "role": "primary",
+        "displayName": "Enamel Blue",
+        "canonical": "#17409C",
+        "tonalRamp": ["#081A45", "#0C255E", "#10307A", "#17409C", "#315BB8", "#5E80CD", "#9FB5E5", "#E8EEF9"]
+      },
+      "enamel-deep": {
+        "role": "primary",
+        "displayName": "Enamel Deep",
+        "canonical": "#10307A",
+        "tonalRamp": ["#061333", "#0A1E4F", "#10307A", "#17409C", "#315BB8", "#5E80CD", "#9FB5E5", "#E8EEF9"]
+      },
+      "porcelain": {
+        "role": "neutral",
+        "displayName": "Porcelain Ground",
+        "canonical": "#F4F6F3",
+        "tonalRamp": ["#16212E", "#38424D", "#586472", "#7C8794", "#A9B2AC", "#DDE2DD", "#F4F6F3", "#FFFFFF"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#16212E",
+        "tonalRamp": ["#0B1118", "#16212E", "#2A3646", "#424F60", "#586472", "#7C8794", "#C2C9CF", "#F4F6F3"]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "canonical": "#586472",
+        "tonalRamp": ["#16212E", "#2F3944", "#444F5B", "#586472", "#7C8794", "#A2ABB4", "#D0D5DA", "#F4F6F3"]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Rule",
+        "canonical": "#DDE2DD",
+        "tonalRamp": ["#16212E", "#424A45", "#6B736E", "#99A19C", "#BDC3BE", "#DDE2DD", "#EEF1EE", "#F4F6F3"]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Plate & Field Outline",
+        "canonical": "#7C8794",
+        "tonalRamp": ["#16212E", "#333C46", "#586472", "#7C8794", "#9DA6B0", "#C4CBD2", "#E3E7EA", "#F4F6F3"]
+      },
+      "paid": {
+        "role": "semantic",
+        "displayName": "Paid Glaze",
+        "canonical": "#0F7A47",
+        "tonalRamp": ["#06331D", "#0A5230", "#0F7A47", "#1D995E", "#4CB582", "#87CFA9", "#C5E8D5", "#ECF8F1"]
+      },
+      "wait": {
+        "role": "semantic",
+        "displayName": "Wait & Focus Glaze",
+        "canonical": "#E9A100",
+        "tonalRamp": ["#231A00", "#5C4000", "#9E6D00", "#E9A100", "#F3B933", "#F8CE6C", "#FCE4AB", "#FEF6E0"]
+      },
+      "late": {
+        "role": "semantic",
+        "displayName": "Late Glaze",
+        "canonical": "#C8281E",
+        "tonalRamp": ["#4A0E0A", "#8E1C15", "#C8281E", "#DF4B41", "#EC7C74", "#F4ACA7", "#FBEAE8", "#FEF5F4"]
+      },
+      "late-wash": {
+        "role": "semantic",
+        "displayName": "Rejection Notice Wash",
+        "canonical": "#FBEAE8",
+        "tonalRamp": ["#5C1A15", "#8E1C15", "#C8281E", "#E0736B", "#F0ABA6", "#F7CCC8", "#FBEAE8", "#FFF9F8"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Location name on the sign plate (30px / 1.15, weight 800)." },
+      "title": { "displayName": "Title", "purpose": "Next task, invoice amount, page lead (20px mobile / 24px desktop, weight 700)." },
+      "body": { "displayName": "Body", "purpose": "All UI copy, names (600), and section headings (700) at 16px / 1.5." },
+      "small": { "displayName": "Small", "purpose": "Meta, status lines, and legend rows at 14px / 1.45." },
+      "micro": { "displayName": "Micro", "purpose": "Mobile navigation labels and privacy notice only at 12px / 1.4." }
+    },
+    "shadows": [
+      {
+        "name": "surface",
+        "value": "0 1px 0 #DDE2DD, 0 8px 24px -12px rgba(22, 33, 46, 0.18)",
+        "purpose": "Single surface elevation for raised white blocks (next task, invoice blocks, messages)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "glaze-settle",
+        "value": "900ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Single authored transition when a room plate settles from wait to paid under prefers-reduced-motion: no-preference."
+      }
+    ],
+    "breakpoints": [
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Room Plate",
+      "kind": "custom",
+      "refersTo": "plate",
+      "description": "Enamel house-number room plate encoding invoice status via glaze and drawn corner mark.",
+      "html": "<a href=\"#\" class=\"ds-plate ds-plate-paid\" aria-label=\"Kamar 03, lunas\">03<svg class=\"ds-plate-mark\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M3 8.5l3 3 7-7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>",
+      "css": ".ds-plate { position: relative; display: grid; place-items: center; width: 44px; aspect-ratio: 1; border-radius: 10px; font: 800 18px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; text-decoration: none; color: #FFFFFF; background: #0F7A47; box-shadow: inset 0 0 0 3px #0F7A47, inset 0 0 0 5px rgba(255,255,255,.88); } .ds-plate-mark { position: absolute; top: 9%; right: 9%; width: 26%; height: 26%; } .ds-plate:focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; }"
+    },
+    {
+      "name": "Sign Plate",
+      "kind": "card",
+      "refersTo": "sign-plate",
+      "description": "Location enamel sign plate header with double inner white rim.",
+      "html": "<header class=\"ds-sign-plate\"><p class=\"ds-sign-meta\">Evy Kost Management</p><p class=\"ds-sign-title\">Kost Ancol</p></header>",
+      "css": ".ds-sign-plate { background: #17409C; color: #FFFFFF; border-radius: 16px; padding: 16px 20px 20px; font-family: system-ui, sans-serif; box-shadow: inset 0 0 0 6px #17409C, inset 0 0 0 8px rgba(255,255,255,.85); } .ds-sign-meta { margin: 0; font-size: 14px; color: rgba(255,255,255,.9); } .ds-sign-title { margin: 2px 0 0; font-size: 24px; font-weight: 800; line-height: 1.15; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Enamel blue primary action button with 48px touch target.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\">Setujui pembayaran</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border: 0; border-radius: 12px; background: #17409C; color: #FFFFFF; font: 700 16px/1.5 system-ui, sans-serif; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: #10307A; } .ds-btn-primary:focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White secondary action button with 2px enamel inset border.",
+      "html": "<button type=\"button\" class=\"ds-btn-secondary\">Lihat riwayat</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border: 0; border-radius: 12px; background: #FFFFFF; color: #17409C; font: 700 16px/1.5 system-ui, sans-serif; box-shadow: inset 0 0 0 2px #17409C; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-secondary:hover { background: #F4F6F3; } .ds-btn-secondary:focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; }"
+    },
+    {
+      "name": "Upload Target",
+      "kind": "input",
+      "refersTo": "upload-target",
+      "description": "Label wrapping a visually hidden file input styled as a primary upload action.",
+      "html": "<label class=\"ds-upload\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\"><path d=\"M10 13V3m0 0L6 7m4-4l4 4M3 13v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>Unggah bukti transfer</span><input type=\"file\" accept=\"image/jpeg,image/png\" class=\"ds-sr-only\"></label>",
+      "css": ".ds-upload { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 12px; background: #17409C; color: #FFFFFF; font: 700 16px/1.5 system-ui, sans-serif; cursor: pointer; } .ds-upload:hover { background: #10307A; } .ds-upload:focus-within { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; } .ds-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "48px white form input with 2px outline border and explicit label.",
+      "html": "<div class=\"ds-field-wrap\"><label class=\"ds-field-label\" for=\"ds-kamar\">Nomor kamar</label><input id=\"ds-kamar\" type=\"text\" placeholder=\"Contoh: A-12\" class=\"ds-field-input\"></div>",
+      "css": ".ds-field-wrap { font-family: system-ui, sans-serif; } .ds-field-label { display: block; font-size: 14px; font-weight: 600; color: #16212E; } .ds-field-input { display: block; width: 100%; min-height: 48px; margin-top: 6px; padding: 0 16px; border: 2px solid #7C8794; border-radius: 12px; background: #FFFFFF; color: #16212E; font: 400 16px/1.5 system-ui, sans-serif; font-variant-numeric: tabular-nums; box-sizing: border-box; } .ds-field-input:hover { border-color: #586472; } .ds-field-input:focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; }"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Desktop enamel rail item showing active inverted white state and hover state.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" aria-current=\"page\" class=\"ds-nav-link ds-nav-active\">Beranda</a><a href=\"#\" class=\"ds-nav-link\">Tagihan</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 4px; padding: 12px; background: #17409C; border-radius: 12px; font-family: system-ui, sans-serif; } .ds-nav-link { display: flex; align-items: center; min-height: 44px; padding: 8px 16px; border-radius: 8px; color: rgba(255,255,255,.9); text-decoration: none; font-size: 16px; } .ds-nav-link:hover { background: #10307A; color: #FFFFFF; } .ds-nav-active { background: #FFFFFF; color: #17409C; font-weight: 700; } .ds-nav-link:focus-visible { outline: 3px solid #E9A100; outline-offset: 2px; box-shadow: 0 0 0 7px #16212E; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Plat Nomor",
+    "overview": "Every room is an enamel house-number plate; the plate's glaze is the room's invoice state. Enamel blue carries the shell and the primary action; colour otherwise lives only on plates. Text stays ink. Built with Tailwind CSS and system fonts.",
+    "keyCharacteristics": [
+      "Enamel blue (#17409C) shell and primary action on a porcelain (#F4F6F3) ground",
+      "Square room number plates with inner rim, tabular numerals, and drawn 2px corner marks",
+      "System font stack only with weight carrying rank",
+      "One surface shadow only, zero decorative metric cards or icon fonts"
+    ],
+    "rules": [
+      { "name": "Colour Lives on Plates", "body": "Body text never takes a glaze colour, except late (#C8281E) for a late status line.", "section": "colors" },
+      { "name": "Never Colour Alone", "body": "Every glaze has a drawn corner mark and every plate has an aria-label with the state in words.", "section": "components" },
+      { "name": "No Ornament", "body": "No metric-card rows, no eyebrow labels above headings, no gradient text, no glass, no emoji as icons.", "section": "components" }
+    ],
+    "dos": [
+      "Do format amounts as Rp 1.850.000 (dot thousands, no decimals) with tabular-nums.",
+      "Do use system font stack only and drawn 2px stroke inline SVG icons."
+    ],
+    "donts": [
+      "Don't add eyebrow labels above headings, gradient text, glass, or metric-card rows.",
+      "Don't use colour alone without a corner mark and text state label."
+    ]
+  }
+}

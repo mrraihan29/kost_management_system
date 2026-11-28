@@ -1,0 +1,13 @@
+{% comment %}
+Primary or secondary Plat Nomor button (DESIGN.md).
+Params: label, variant (primary|secondary), type (button|submit), href, disabled, loading, loading_label, icon, extra_class.
+{% endcomment %}
+{% if variant == "secondary" %}
+  {% with tone="bg-white text-enamel shadow-[inset_0_0_0_2px_#17409C] hover:bg-porcelain" %}
+    {% include "partials/_button_inner.html" %}
+  {% endwith %}
+{% else %}
+  {% with tone="bg-enamel text-white hover:bg-enamel-deep" %}
+    {% include "partials/_button_inner.html" %}
+  {% endwith %}
+{% endif %}
