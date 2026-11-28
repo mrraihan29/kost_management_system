@@ -1,10 +1,10 @@
-"""Billing cycle calculation and invoice issuing rules (R-012, R-013, R-014, D-013)."""
+"""Billing cycle calculation and invoice issuing rules (R-012, R-013, R-014, R-023, D-013, D-020)."""
 
 import calendar
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import IntegrityError, transaction
@@ -16,6 +16,7 @@ from tenants.models import TenantContract
 LOOKAHEAD_DAYS = 7
 DUE_OFFSET_DAYS = 10
 SIMULTANEOUS_DUE_DAY = 11
+PRORATION_ROUNDING_UNIT = Decimal("1000")
 
 security_logger = logging.getLogger("security")
 
@@ -32,20 +33,39 @@ def _next_month(year: int, month: int) -> tuple[int, int]:
     return (year + 1, 1) if month == 12 else (year, month + 1)
 
 
-def _create_invoice(contract: TenantContract, period_start: date, due_date: date) -> Invoice | None:
+def _create_invoice(
+    contract: TenantContract,
+    period_start: date,
+    due_date: date,
+    base_rent_amount: Decimal | None = None,
+) -> Invoice | None:
     """Insert one BELUM_LUNAS invoice idempotently; IntegrityError means already issued."""
+    rent = contract.monthly_rent_amount if base_rent_amount is None else base_rent_amount
     try:
         with transaction.atomic():
             return Invoice.objects.create(
                 contract=contract,
                 billing_period_start=period_start,
                 due_date=due_date,
-                base_rent_amount=contract.monthly_rent_amount,
+                base_rent_amount=rent,
                 electricity_bill_amount=Decimal("0"),
                 status="BELUM_LUNAS",
             )
     except IntegrityError:
         return None
+
+
+def _prorate_rent(monthly_rent: Decimal, start_date: date) -> Decimal:
+    """Prorate monthly rent inclusively from start_date to month end, rounded half-up to Rp 1.000."""
+    if start_date.day == 1:
+        return monthly_rent
+    _, days_in_month = calendar.monthrange(start_date.year, start_date.month)
+    prorate_days = days_in_month - start_date.day + 1
+    raw = (monthly_rent * Decimal(prorate_days)) / Decimal(days_in_month)
+    rounded = (raw / PRORATION_ROUNDING_UNIT).quantize(
+        Decimal("1"), rounding=ROUND_HALF_UP
+    ) * PRORATION_ROUNDING_UNIT
+    return rounded.quantize(Decimal("0.01"))
 
 
 def _require_simultaneous(location: KostLocation, year: int, month: int) -> date:
@@ -152,3 +172,27 @@ def issue(location: KostLocation, year: int, month: int, by: AbstractBaseUser) -
         len(created),
     )
     return created
+
+
+def first_invoice(contract: TenantContract) -> Invoice:
+    """Issue a contract's first invoice: full month for per_room_cycle, prorated for simultaneous."""
+    start = contract.start_date
+    billing_mode = contract.room.kost_location.billing_mode
+    rent = (
+        _prorate_rent(contract.monthly_rent_amount, start)
+        if billing_mode == KostLocation.BillingMode.SIMULTANEOUS.value
+        else contract.monthly_rent_amount
+    )
+    invoice = _create_invoice(
+        contract,
+        start,
+        start + timedelta(days=DUE_OFFSET_DAYS),
+        base_rent_amount=rent,
+    )
+    if invoice is None:
+        return Invoice.objects.get(
+            contract=contract,
+            billing_period_year=start.year,
+            billing_period_month=start.month,
+        )
+    return invoice
