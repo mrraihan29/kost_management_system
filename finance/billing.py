@@ -1,4 +1,4 @@
-"""Billing cycle calculation and invoice issuing rules (R-012, R-013, R-014, R-023, D-013, D-020)."""
+"""Billing cycle calculation and invoice issuing rules (R-012, R-013, R-014, R-015, R-023, D-013, D-020)."""
 
 import calendar
 import logging
@@ -8,8 +8,9 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 
-from core.models import KostLocation
+from core.models import KostLocation, Room
 from finance.models import Invoice
 from tenants.models import TenantContract
 
@@ -196,3 +197,32 @@ def first_invoice(contract: TenantContract) -> Invoice:
             billing_period_month=start.month,
         )
     return invoice
+
+
+def room_requires_meter(room: Room) -> bool:
+    """Return True when the room's location bills electricity in-app and the room is not token."""
+    return bool(room.kost_location.bills_electricity and not room.is_token_electricity)
+
+
+def tenant_visible_invoices(contract: TenantContract) -> QuerySet[Invoice]:
+    """Return invoices visible and payable to the Tenant, gating unread metered invoices (R-015)."""
+    qs = Invoice.objects.filter(contract=contract)
+    if room_requires_meter(contract.room):
+        return qs.filter(electricity_reading__isnull=False)
+    return qs
+
+
+def invoices_needing_meter(location: KostLocation) -> QuerySet[Invoice]:
+    """Return unpaid/late invoices at `location` waiting for an electricity meter reading (R-015)."""
+    if not location.bills_electricity:
+        return Invoice.objects.none()
+    return (
+        Invoice.objects.filter(
+            contract__room__kost_location=location,
+            contract__room__is_token_electricity=False,
+            status__in=("BELUM_LUNAS", "TELAT_BAYAR"),
+            electricity_reading__isnull=True,
+        )
+        .select_related("contract__tenant", "contract__room")
+        .order_by("due_date", "contract__room__room_number")
+    )

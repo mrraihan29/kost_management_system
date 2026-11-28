@@ -920,8 +920,14 @@ class FullBusinessProcessTest(TestCase):
         self.assertContains(resp, "Payment Tenant")
 
     def test_phase7_06_public_upload_payment(self):
-        """F-03: Upload payment proof changes invoice status."""
+        """F-03: Upload payment proof changes invoice status (after meter reading)."""
         tenant, contract, invoice = self._setup_payment_data()
+        ElectricityReading.objects.create(
+            invoice=invoice,
+            meter_reading_start=0,
+            meter_reading_end=10,
+            rate_per_kwh=Decimal("1500"),
+        )
         # Login via PIN
         self.public_client.post(
             reverse("public_payment_step1"),
@@ -2003,6 +2009,12 @@ class FullBusinessProcessTest(TestCase):
     def test_phase7_13_step2_template_copy_matches_rules(self):
         """W12/BQ-12: upload page text reflects image-only 5 MB rule."""
         tenant, contract, invoice = self._setup_payment_data()
+        ElectricityReading.objects.create(
+            invoice=invoice,
+            meter_reading_start=0,
+            meter_reading_end=10,
+            rate_per_kwh=Decimal("1500"),
+        )
         session = self.public_client.session
         session["verified_contract_id"] = contract.id
         session.save()
@@ -2881,6 +2893,12 @@ class FullBusinessProcessTest(TestCase):
     def test_w2_05_upload_confirmation_uses_locked_invoice(self):
         """W2: public upload confirmation re-checks the invoice under a row lock."""
         tenant, contract, invoice = self._setup_payment_data()
+        ElectricityReading.objects.create(
+            invoice=invoice,
+            meter_reading_start=0,
+            meter_reading_end=10,
+            rate_per_kwh=Decimal("1500"),
+        )
         session = self.public_client.session
         session["verified_contract_id"] = contract.id
         session.save()

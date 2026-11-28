@@ -62,5 +62,5 @@ exclude = ["**/migrations", "**/__pycache__"]
 pythonVersion = "3.14"
 typeCheckingMode = "basic"
 # Strict for modules created from EKM-12 on (CONSTRAINTS.md exception X-1).
-strict = ["config/settings_test.py", "config/tests_settings.py", "core/scoping.py", "core/tests/test_scoping.py", "finance/portal.py", "finance/tests/test_portal_access.py", "core/navigation.py", "core/tests/test_shell.py", "core/formats.py", "core/tests/test_formats.py", "finance/templatetags/finance_extras.py", "core/tests/test_location_settings.py", "finance/billing.py", "finance/management/commands/issue_due_invoices.py", "finance/tests/test_billing_cycle.py", "finance/tests/test_billing_simultaneous.py", "finance/tests/test_first_invoice.py"]
+strict = ["config/settings_test.py", "config/tests_settings.py", "core/scoping.py", "core/tests/test_scoping.py", "finance/portal.py", "finance/tests/test_portal_access.py", "core/navigation.py", "core/tests/test_shell.py", "core/formats.py", "core/tests/test_formats.py", "finance/templatetags/finance_extras.py", "core/tests/test_location_settings.py", "finance/billing.py", "finance/management/commands/issue_due_invoices.py", "finance/tests/test_billing_cycle.py", "finance/tests/test_billing_simultaneous.py", "finance/tests/test_first_invoice.py", "finance/tests/test_meter_gating.py"]
 reportMissingModuleSource = false

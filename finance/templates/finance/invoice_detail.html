@@ -64,8 +64,10 @@
                                 Listrik
                                 {% if electricity %}
                                     <span class="badge bg-info text-dark ms-2" style="font-size: 0.7em;">{{ electricity.calculated_amount|rupiah }}</span>
-                                {% else %}
+                                {% elif requires_meter %}
                                     <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">Belum Input</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark border ms-2" style="font-size: 0.7em;">Tidak ditagih</span>
                                 {% endif %}
                             </td>
                             <td class="text-end fw-bold py-3">{{ invoice.electricity_bill_amount|rupiah }}</td>
@@ -132,12 +134,17 @@
                         </p>
                     </div>
 
-                {% elif invoice.contract.room.is_token_electricity %}
-                    <!-- JIKA TOKEN (Listrik Prabayar) -->
+                {% elif not requires_meter %}
+                    <!-- TOKEN ATAU LOKASI TANPA TAGIHAN LISTRIK (R-015) -->
                     <div class="text-center py-5">
                         <i class="fas fa-plug fa-3x text-muted mb-3 opacity-50"></i>
-                        <h6 class="fw-bold">Kamar ini menggunakan Token.</h6>
-                        <p class="text-muted small">Tidak perlu input meteran bulanan.</p>
+                        {% if invoice.contract.room.is_token_electricity %}
+                            <h6 class="fw-bold">Kamar ini menggunakan Token.</h6>
+                            <p class="text-muted small">Tidak perlu input meteran bulanan.</p>
+                        {% else %}
+                            <h6 class="fw-bold">Lokasi ini tidak menagih listrik lewat aplikasi.</h6>
+                            <p class="text-muted small">Penghuni menggunakan token PLN masing-masing kamar.</p>
+                        {% endif %}
                     </div>
                 
                 {% else %}

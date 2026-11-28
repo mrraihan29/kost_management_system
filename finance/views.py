@@ -112,7 +112,7 @@ def public_payment_step2(request):
         messages.error(request, "Sesi habis. Silakan masukkan PIN ulang.")
         return redirect("public_payment_step1")
     active_invoice = (
-        Invoice.objects.filter(contract=contract)
+        billing.tenant_visible_invoices(contract)
         .exclude(status__in=["LUNAS", "MENUNGGU_VERIFIKASI"])
         .order_by("-billing_period_start")
         .first()
@@ -127,13 +127,22 @@ def public_payment_step2(request):
                 locked_invoice = None
                 if active_invoice is not None:
                     locked_invoice = (
-                        Invoice.objects.select_for_update().filter(pk=active_invoice.pk).first()
+                        Invoice.objects.select_for_update()
+                        .select_related("contract__room__kost_location")
+                        .filter(pk=active_invoice.pk)
+                        .first()
                     )
 
-                # Re-check INSIDE the lock: the invoice may have been decided meanwhile
-                if locked_invoice is None or locked_invoice.status not in (
-                    "BELUM_LUNAS",
-                    "TELAT_BAYAR",
+                # Re-check INSIDE the lock: decided meanwhile or unread metered invoice (R-015)
+                missing_meter = (
+                    locked_invoice is not None
+                    and billing.room_requires_meter(locked_invoice.contract.room)
+                    and not ElectricityReading.objects.filter(invoice=locked_invoice).exists()
+                )
+                if (
+                    locked_invoice is None
+                    or locked_invoice.status not in ("BELUM_LUNAS", "TELAT_BAYAR")
+                    or missing_meter
                 ):
                     messages.error(request, "Tidak ada tagihan aktif yang perlu dibayar.")
                     return redirect("public_payment_step2")
@@ -174,8 +183,8 @@ def public_payment_history(request):
         messages.error(request, "Sesi habis. Silakan masukkan PIN ulang.")
         return redirect("public_payment_step1")
 
-    # Ambil SEMUA invoice, urutkan dari yang terbaru
-    invoices = Invoice.objects.filter(contract=contract).order_by("-billing_period_start")
+    # Ambil tagihan yang sudah boleh dilihat penghuni (R-015), urutkan dari yang terbaru
+    invoices = billing.tenant_visible_invoices(contract).order_by("-billing_period_start")
 
     # E-05 fix: Pagination untuk riwayat pembayaran
     paginator = Paginator(invoices, 10)
@@ -354,13 +363,18 @@ def invoice_detail(request, pk):
 
     # Cek apakah sudah ada catatan listrik?
     electricity = ElectricityReading.objects.filter(invoice=invoice).first()
+    requires_meter = billing.room_requires_meter(invoice.contract.room)
 
     # Handle Form Listrik
     if request.method == "POST":
         # W2: serialize electricity writes against payment verification on the invoice row.
         # Lock order (all flows): Invoice first, then Payment (verify_payment: Invoice -> Payment).
         with transaction.atomic():
-            locked_invoice = Invoice.objects.select_for_update().get(pk=pk)
+            locked_invoice = (
+                Invoice.objects.select_for_update()
+                .select_related("contract__room__kost_location")
+                .get(pk=pk)
+            )
 
             # W2/W3/BQ-5: paid or awaiting-verification invoices are financially immutable
             if locked_invoice.status in ("LUNAS", "MENUNGGU_VERIFIKASI"):
@@ -369,9 +383,10 @@ def invoice_detail(request, pk):
                     "Nilai tagihan ini tidak dapat diubah karena sudah dibayar atau menunggu verifikasi.",
                 )
                 return redirect("invoice_detail", pk=pk)
-            if locked_invoice.contract.room.is_token_electricity:
+            if not billing.room_requires_meter(locked_invoice.contract.room):
                 messages.error(
-                    request, "Kamar ini menggunakan token; input meteran tidak diperlukan."
+                    request,
+                    "Kamar atau lokasi ini tidak menagih listrik lewat aplikasi; input meteran tidak diperlukan.",
                 )
                 return redirect("invoice_detail", pk=pk)
 
@@ -407,7 +422,12 @@ def invoice_detail(request, pk):
             default_rate = invoice.contract.room.kost_location.electricity_rate_per_kwh
             form = ElectricityForm(initial={"rate_per_kwh": default_rate})
 
-    context = {"invoice": invoice, "form": form, "electricity": electricity}
+    context = {
+        "invoice": invoice,
+        "form": form,
+        "electricity": electricity,
+        "requires_meter": requires_meter,
+    }
     return render(request, "finance/invoice_detail.html", context)
 
 
